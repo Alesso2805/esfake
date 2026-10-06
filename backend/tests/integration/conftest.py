@@ -6,7 +6,6 @@ Compose and production use, then migrated to head as esfake_owner.
 
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
-from pathlib import Path
 
 import pytest
 from alembic import command
@@ -14,9 +13,10 @@ from alembic.config import Config
 from sqlalchemy.ext.asyncio import AsyncEngine
 from testcontainers.community.postgres import PostgresContainer
 
+from esfake.corpus.modalities import load_catalog, sync_modalities
 from esfake.shared.db import create_engine
+from tests.paths import BACKEND_DIR, MODALITIES_YAML
 
-BACKEND_DIR = Path(__file__).resolve().parents[2]
 BOOTSTRAP_DIR = BACKEND_DIR / "migrations" / "bootstrap"
 POSTGRES_IMAGE = "pgvector/pgvector:0.8.7-pg16"
 DATABASE_NAME = "esfake"
@@ -81,3 +81,8 @@ async def app_engine(database: Database) -> AsyncIterator[AsyncEngine]:
     engine = create_engine(database.app_url)
     yield engine
     await engine.dispose()
+
+
+@pytest.fixture
+async def seeded_modalities(owner_engine: AsyncEngine) -> None:
+    await sync_modalities(owner_engine, load_catalog(MODALITIES_YAML))

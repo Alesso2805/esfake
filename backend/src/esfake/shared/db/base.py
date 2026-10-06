@@ -1,8 +1,12 @@
 """Declarative base and the constraint helpers shared by every table."""
 
 from collections.abc import Iterable
+from datetime import datetime
+from decimal import Decimal
+from typing import Any
 
-from sqlalchemy import CheckConstraint, MetaData
+from sqlalchemy import CheckConstraint, DateTime, MetaData, Numeric, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase
 
 # Deterministic constraint names, so migrations and `alembic check` agree on every environment.
@@ -31,6 +35,14 @@ LABELS = ("scam", "legit")
 
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
+    # Timestamps are always timezone-aware; time comes from the injected Clock, never from
+    # server defaults (CLAUDE.md rule 13). Money is exact.
+    type_annotation_map = {  # noqa: RUF012
+        str: Text(),
+        datetime: DateTime(timezone=True),
+        Decimal: Numeric(12, 6),
+        dict[str, Any]: JSONB(),
+    }
 
 
 def sql_in(values: Iterable[str]) -> str:
