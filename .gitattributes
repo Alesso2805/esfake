@@ -1,0 +1,14 @@
+# Normalize every text file to LF, in the index and in working copies, on every OS.
+* text=auto eol=lf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.onnx binary
+*.pdf binary
