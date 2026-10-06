@@ -8,6 +8,7 @@ from esfake.shared.db.models.corpus import (
     Modality,
     PipelineManifest,
 )
+from esfake.shared.db.models.operation import AuditLog, RateLimitWindow, SpendLedger
 from esfake.shared.db.models.verification import (
     ChannelIdentity,
     Feedback,
@@ -19,6 +20,7 @@ from esfake.shared.db.models.verification import (
 )
 
 __all__ = [
+    "AuditLog",
     "ChannelIdentity",
     "CorpusMessage",
     "EvalResult",
@@ -27,7 +29,9 @@ __all__ = [
     "LabelingTask",
     "Modality",
     "PipelineManifest",
+    "RateLimitWindow",
     "Signal",
+    "SpendLedger",
     "Url",
     "Verdict",
     "Verification",

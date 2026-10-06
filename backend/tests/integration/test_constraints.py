@@ -5,7 +5,7 @@ rolled back, and asserts which constraint fired, so a case cannot pass for the w
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -24,7 +24,9 @@ from esfake.shared.db.models import (
     LabelingTask,
     Modality,
     PipelineManifest,
+    RateLimitWindow,
     Signal,
+    SpendLedger,
     Url,
     Verdict,
     Verification,
@@ -210,6 +212,29 @@ def eval_result(**overrides: Any) -> Row:
         "correct": True,
         "llm_used": False,
         "live_call": False,
+    } | overrides
+
+
+def spend(**overrides: Any) -> Row:
+    return SpendLedger, {
+        "scope": "llm",
+        "period_kind": "month",
+        "period_start": date(2026, 10, 1),
+        "free_quota": 0,
+        "units": 80,
+        "billable_units": 80,
+        "cost_usd": Decimal("0.10"),
+        "cap_usd": Decimal("10"),
+    } | overrides
+
+
+def rate_limit(**overrides: Any) -> Row:
+    return RateLimitWindow, {
+        "key_hmac": HMAC,
+        "route": "POST /v1/verify",
+        "window_kind": "minute",
+        "window_start": NOW,
+        "request_count": 1,
     } | overrides
 
 
@@ -443,6 +468,32 @@ CASES: list[tuple[str, list[Row], Row, str]] = [
         [manifest(), eval_run()],
         eval_result(predicted_level="safe"),
         "ck_eval_results_predicted_level_valid",
+    ),
+    ("spend scope", [], spend(scope="sms"), "ck_spend_ledger_scope_valid"),
+    (
+        "daily sub-cap for whatsapp",
+        [],
+        spend(scope="whatsapp", period_kind="day"),
+        "ck_spend_ledger_daily_only_for_llm",
+    ),
+    (
+        "more billable units than units",
+        [],
+        spend(units=10, billable_units=11),
+        "ck_spend_ledger_billable_within_units",
+    ),
+    ("negative cost", [], spend(cost_usd=Decimal("-1")), "ck_spend_ledger_money_non_negative"),
+    (
+        "rate limit keyed by a raw IP",
+        [],
+        rate_limit(key_hmac="203.0.113.7"),
+        "ck_rate_limit_windows_key_hmac_format",
+    ),
+    (
+        "rate limit window",
+        [],
+        rate_limit(window_kind="hour"),
+        "ck_rate_limit_windows_window_kind_valid",
     ),
 ]
 

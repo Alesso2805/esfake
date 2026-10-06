@@ -28,6 +28,35 @@ async def test_bootstrap_creates_roles_extension_and_ownership(owner_engine: Asy
     assert superuser is False
 
 
+async def test_schema_has_the_sixteen_tables(app_engine: AsyncEngine) -> None:
+    async with app_engine.connect() as conn:
+        tables = await conn.scalars(
+            text(
+                "SELECT tablename FROM pg_tables"
+                " WHERE schemaname = 'public' AND tablename <> 'alembic_version'"
+            )
+        )
+
+    assert set(tables) == {
+        "channel_identities",
+        "verifications",
+        "verification_queue",
+        "urls",
+        "signals",
+        "verdicts",
+        "feedback",
+        "modalities",
+        "corpus_messages",
+        "labeling_tasks",
+        "pipeline_manifests",
+        "eval_runs",
+        "eval_results",
+        "spend_ledger",
+        "rate_limit_windows",
+        "audit_log",
+    }
+
+
 def test_migrations_downgrade_to_base_and_upgrade_again(database: Database) -> None:
     config = alembic_config(database.owner_url)
 
