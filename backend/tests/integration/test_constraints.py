@@ -11,13 +11,17 @@ from typing import Any
 
 import pytest
 from sqlalchemy import insert
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from esfake.shared.db.base import Base
 from esfake.shared.db.models import (
     ChannelIdentity,
+    CorpusMessage,
+    EvalResult,
+    EvalRun,
     Feedback,
+    LabelingTask,
     Modality,
     PipelineManifest,
     Signal,
@@ -34,6 +38,8 @@ HMAC = "k1:" + "a" * 64
 MANIFEST_HASH = "c" * 64
 IDENTITY_ID = uuid.UUID("01900000-0000-7000-8000-000000000001")
 VERIFICATION_ID = uuid.UUID("01900000-0000-7000-8000-000000000002")
+DONATED_ID = uuid.UUID("01900000-0000-7000-8000-000000000003")
+RUN_ID = uuid.UUID("01900000-0000-7000-8000-000000000004")
 LLM_CALL = {
     "llm_used": True,
     "route": "gray_zone",
@@ -146,7 +152,69 @@ def feedback(**overrides: Any) -> Row:
     } | overrides
 
 
+def donated_verification(**overrides: Any) -> Row:
+    return verification(
+        id=DONATED_ID,
+        external_message_hmac="k1:" + "b" * 64,
+        donated_at=NOW,
+        consent_version="2026-10",
+        donation_code_hash="k1:" + "d" * 64,
+        **overrides,
+    )
+
+
+def corpus_message(**overrides: Any) -> Row:
+    return CorpusMessage, {
+        "case_id": "k1:" + "e" * 64,
+        "source": "public_alert",
+        "text_redacted": "Hola mamá, cambié de número, deposítame a [ACCOUNT]",
+        "label": "scam",
+        "modality_code": "family_emergency",
+        "language": "es",
+        "cluster_id": "c-0001",
+        "split": "index",
+        "split_assigned_at": NOW,
+        "embedding": [0.0] * 384,
+        "embedding_model": "paraphrase-multilingual-MiniLM-L12-v2",
+        "dataset_version": "1.0",
+        "added_by": "corpus-import",
+        "added_at": NOW,
+    } | overrides
+
+
+def labeling_task(**overrides: Any) -> Row:
+    return LabelingTask, {"verification_id": DONATED_ID, "status": "pending"} | overrides
+
+
+def eval_run(**overrides: Any) -> Row:
+    return EvalRun, {
+        "id": RUN_ID,
+        "manifest_hash": MANIFEST_HASH,
+        "dataset_version": "1.0",
+        "suite": "eval",
+        "mode": "cached_strict",
+        "repetitions": 1,
+        "live_calls": 0,
+        "started_at": NOW,
+    } | overrides
+
+
+def eval_result(**overrides: Any) -> Row:
+    return EvalResult, {
+        "run_id": RUN_ID,
+        "case_source": "corpus",
+        "case_id": "k1:" + "e" * 64,
+        "expected_label": "scam",
+        "predicted_level": "suspicious",
+        "route": "early_exit",
+        "correct": True,
+        "llm_used": False,
+        "live_call": False,
+    } | overrides
+
+
 VERIFIED = [manifest(), identity(), verification()]
+DONATED = [manifest(), identity(), donated_verification()]
 
 CASES: list[tuple[str, list[Row], Row, str]] = [
     ("modality kind", [], modality(kind="audio"), "ck_modalities_kind_valid"),
@@ -286,6 +354,96 @@ CASES: list[tuple[str, list[Row], Row, str]] = [
         feedback(id=uuid.uuid7()),
         "uq_feedback_verification_id",
     ),
+    ("corpus source", [], corpus_message(source="scraped"), "ck_corpus_messages_source_valid"),
+    ("corpus label", [], corpus_message(label="maybe"), "ck_corpus_messages_label_valid"),
+    ("corpus split", [], corpus_message(split="train"), "ck_corpus_messages_split_valid"),
+    (
+        "legit message without subcategory",
+        [],
+        corpus_message(label="legit", modality_code=None),
+        "ck_corpus_messages_legit_subcategory",
+    ),
+    (
+        "synthetic message in test",
+        [],
+        corpus_message(source="synthetic", split="test"),
+        "ck_corpus_messages_synthetic_not_in_test",
+    ),
+    (
+        "donation without its verification",
+        [],
+        corpus_message(source="donated"),
+        "ck_corpus_messages_donation_provenance",
+    ),
+    (
+        "donation whose case_id is not its verification id",
+        DONATED,
+        corpus_message(source="donated", source_verification_id=DONATED_ID, retain_until=NOW),
+        "ck_corpus_messages_donation_provenance",
+    ),
+    (
+        "dataset version not MAJOR.MINOR",
+        [],
+        corpus_message(dataset_version="v1"),
+        "ck_corpus_messages_dataset_version_format",
+    ),
+    (
+        "duplicate case_id",
+        [corpus_message()],
+        corpus_message(id=uuid.uuid7()),
+        "uq_corpus_messages_case_id",
+    ),
+    (
+        "labeling task for a message that was not donated",
+        VERIFIED,
+        labeling_task(verification_id=VERIFICATION_ID),
+        "was not donated",
+    ),
+    ("labeling status", DONATED, labeling_task(status="done"), "ck_labeling_tasks_status_valid"),
+    (
+        "labeled task without label",
+        DONATED,
+        labeling_task(status="labeled"),
+        "ck_labeling_tasks_labeled_complete",
+    ),
+    (
+        "legit label without subcategory",
+        DONATED,
+        labeling_task(label="legit"),
+        "ck_labeling_tasks_legit_subcategory",
+    ),
+    ("eval suite", [manifest()], eval_run(suite="smoke"), "ck_eval_runs_suite_valid"),
+    ("eval mode", [manifest()], eval_run(mode="replay"), "ck_eval_runs_mode_valid"),
+    (
+        "zero repetitions",
+        [manifest()],
+        eval_run(repetitions=0),
+        "ck_eval_runs_repetitions_positive",
+    ),
+    (
+        "run finished before it started",
+        [manifest()],
+        eval_run(finished_at=datetime(2026, 10, 5, tzinfo=UTC)),
+        "ck_eval_runs_finished_after_start",
+    ),
+    (
+        "live call without the model",
+        [manifest(), eval_run()],
+        eval_result(live_call=True),
+        "ck_eval_results_live_call_uses_llm",
+    ),
+    (
+        "corpus result marked correct for a missed scam",
+        [manifest(), eval_run()],
+        eval_result(predicted_level="no_signals"),
+        "ck_eval_results_correct_matches_level",
+    ),
+    (
+        "predicted level",
+        [manifest(), eval_run()],
+        eval_result(predicted_level="safe"),
+        "ck_eval_results_predicted_level_valid",
+    ),
 ]
 
 
@@ -316,8 +474,37 @@ async def test_valid_rows_are_accepted(app_engine: AsyncEngine) -> None:
             signal(layer="similarity", neighbor_ids=[uuid.uuid7()]),
             verdict(**LLM_CALL | {"level": "likely_scam", "modality_code": "family_emergency"}),
             feedback(user_label="scam"),
+            donated_verification(),
+            labeling_task(
+                status="labeled",
+                label="legit",
+                subcategory="bank_notification",
+                labeled_by="alessandro",
+                labeled_at=NOW,
+            ),
+            corpus_message(),
+            corpus_message(
+                case_id=str(DONATED_ID),
+                source="donated",
+                source_verification_id=DONATED_ID,
+                retain_until=NOW,
+            ),
+            corpus_message(
+                case_id="k1:" + "f" * 64, label="legit", modality_code=None, subcategory="easy"
+            ),
+            eval_run(),
+            eval_result(),
+            eval_result(
+                case_source="redteam", case_id="rt-001", predicted_level="no_signals", correct=False
+            ),
         ],
     )
+
+
+@pytest.mark.usefixtures("seeded_modalities")
+async def test_embeddings_must_have_384_dimensions(app_engine: AsyncEngine) -> None:
+    with pytest.raises(DBAPIError, match="expected 384 dimensions"):
+        await _insert(app_engine, [], corpus_message(embedding=[0.0] * 3))
 
 
 @pytest.mark.usefixtures("seeded_modalities")

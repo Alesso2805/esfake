@@ -1,6 +1,13 @@
 """ORM models. Importing this package registers every table on `Base.metadata`."""
 
-from esfake.shared.db.models.corpus import Modality, PipelineManifest
+from esfake.shared.db.models.corpus import (
+    CorpusMessage,
+    EvalResult,
+    EvalRun,
+    LabelingTask,
+    Modality,
+    PipelineManifest,
+)
 from esfake.shared.db.models.verification import (
     ChannelIdentity,
     Feedback,
@@ -13,7 +20,11 @@ from esfake.shared.db.models.verification import (
 
 __all__ = [
     "ChannelIdentity",
+    "CorpusMessage",
+    "EvalResult",
+    "EvalRun",
     "Feedback",
+    "LabelingTask",
     "Modality",
     "PipelineManifest",
     "Signal",
