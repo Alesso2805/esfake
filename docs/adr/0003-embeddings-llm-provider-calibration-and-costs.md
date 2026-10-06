@@ -1,6 +1,6 @@
 # ADR-0003: Embeddings, LLM provider, threshold calibration and running costs
 
-- Status: Proposed (section 5, infrastructure, pending the owner's hosting decision)
+- Status: Proposed
 - Date: 2026-10-06
 - Deciders: Alessandro David
 - Related: `CLAUDE.md` (Stack obligatorio, rules 11 and 12), ADR-0002, ADR-0004, EF-07, EF-10, EF-13, EF-14, EF-15, EF-18, EF-23, EF-25
@@ -96,20 +96,61 @@ The free tier of 1,000 delivered service messages per business phone number per 
 
 We plan conservatively: messages are charged, the cap is 1,000 messages, and EF-23 checks the actual charges in WhatsApp Manager during the first month. The rate for Peru comes from Meta's rate card in EF-23. Under the cap above it does not affect cost.
 
-### 5. Infrastructure and monthly cost (pending)
+### 5. Infrastructure: Oracle Cloud Infrastructure Always Free
 
-The paid options that meet every requirement of ADR-0002 and EF-18 were priced on 2026-10-06:
+**Decision.** Production runs on one Always Free Ampere A1 VM:
+
+- Up to 2 OCPUs and 12 GB of RAM as a single instance.
+- 200 GB of block storage and 20 GB of Object Storage.
+- The home region is São Paulo or Santiago, because Always Free resources exist only in the home region.
+
+Docker Compose runs the same services as in local development: the API with its internal listener, both workers, the web app, and PostgreSQL 16 with pgvector.
+
+**Cost.**
+
+| Item | Cost |
+| --- | --- |
+| Infrastructure | US$0 |
+| Bedrock | Capped at US$10 per month; expected under US$3 |
+| WhatsApp | US$0 under its cap |
+| Domain (EF-18) | A yearly fee, or a free subdomain |
+
+**Requirement relaxed.** Postgres is self-managed, not managed. We own upgrades, monitoring and backups. `docs/SPEC.md` and EF-18 were updated accordingly.
+
+**Requirements that still hold:**
+
+- The instance is always on and nothing suspends Postgres.
+- A direct connection is available for `LISTEN`.
+- pgvector is available.
+- Backups are kept at most 30 days: a nightly `pg_dump` goes to Object Storage, a lifecycle rule deletes copies after 30 days, and EF-18 tests a restore.
+
+**Risks and mitigations:**
+
+- **Idle reclamation.** Oracle may reclaim Always Free instances whose CPU (95th percentile), network and memory (on A1) all stay below 20 % for 7 days. EF-18 monitors this and checks whether upgrading the account to Pay As You Go, which keeps Always Free resources at no cost, removes reclamation (not verified). We will not generate artificial load to evade the policy.
+- **Capacity.** Creating an A1 instance can fail with "out of host capacity". The owner creates the VM well before sprint 4.
+- **ARM64.** Images are built for `linux/arm64` as well as `linux/amd64`, and every dependency must ship arm64 builds: onnxruntime, spaCy, asyncpg and the pgvector image. This is checked when the images are first built (EF-04) and again in EF-18.
+- **Single point of failure.** One VM serves everything. That is acceptable for a pilot and a demo, and an uptime monitor alerts on outages (EF-18).
+- **The free offer may change.** Plan B is a DigitalOcean Droplet with managed PostgreSQL, about US$39 per month on 2026-10-06. It reuses the same Compose files except for the database service.
+
+**Free options rejected** (2026-10-06):
+
+| Option | Reason |
+| --- | --- |
+| Supabase Free | Pauses after a week of inactivity; no managed backups |
+| Neon Free | Suspends after 5 minutes and cannot be disabled |
+| Render Free | Web services sleep; the database is deleted after 30 days |
+| Aiven Free | Powers off when idle; 1 GB of storage |
+| Google Cloud e2-micro | Too little memory |
+| AWS, Azure and Google credits | Expire within 3 to 12 months and require new accounts |
+
+**Paid options that meet the original spec unchanged:**
 
 | Option | Approximate cost per month |
 | --- | --- |
-| Render | ~US$65 |
 | DigitalOcean (Droplet plus managed Postgres) | ~US$39 |
 | Neon plus a Droplet | ~US$45 |
 | Fly.io | ~US$62 |
-
-The requirements are an always-on instance, managed Postgres with pgvector and no auto-suspension, a direct connection for `LISTEN`, and backups of at most 30 days.
-
-The owner prefers free services. The free-tier options and the requirements each one would relax are being evaluated. This section will record the decision and its cost, and any relaxed requirement must also be reflected in `docs/SPEC.md` and EF-18.
+| Render | ~US$65 |
 
 ### 6. Threshold calibration method (rule 12)
 
@@ -148,7 +189,8 @@ The labelled pairs are committed as evidence. Changing the threshold later creat
 - LLM cost is negligible at pilot scale. The caps protect against abuse rather than against normal use.
 - A small, CPU-only embedding stack keeps the free or cheap hosting options open.
 - The embedding choice is provisional until EF-07, then frozen.
-- Data crosses borders in every option: Bedrock's global profile, Meta and the hosting provider. EF-25 must cover these transfers.
+- Hosting is free but self-managed. Database operations and the reclamation risk are ours, with a costed plan B.
+- Data crosses borders in every option: Bedrock's global profile, Meta and Oracle's region in Brazil or Chile. EF-25 must cover these transfers.
 
 ## References
 
@@ -165,3 +207,10 @@ The labelled pairs are committed as evidence. Changing the threshold later creat
 - MTEB results: https://github.com/embeddings-benchmark/results
 - Meta, non-template messages: https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing/non-template-messages
 - Meta, pricing: https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing
+- Oracle Always Free resources: https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm
+- Oracle regions: https://docs.oracle.com/en-us/iaas/Content/General/Concepts/regions.htm
+- Supabase pricing: https://supabase.com/pricing
+- Neon pricing: https://neon.com/pricing
+- Render free tier: https://render.com/docs/free
+- Aiven free plan: https://aiven.io/docs/platform/concepts/free-plan
+- DigitalOcean managed databases pricing: https://www.digitalocean.com/pricing/managed-databases

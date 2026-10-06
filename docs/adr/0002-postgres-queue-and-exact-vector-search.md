@@ -14,7 +14,7 @@ The system needs:
 - Periodic maintenance jobs.
 - Nearest-neighbour search over a labelled corpus of 384-dimensional embeddings. The corpus starts at about 600 messages and should stay in the low thousands during the MVP.
 
-The budget allows one always-on instance and one managed Postgres. The pilot has about 20 people and a few hundred messages. `CLAUDE.md` rules out Redis and message brokers.
+Production runs for free on one always-on VM, with Postgres in a container on that VM (ADR-0003). The pilot has about 20 people and a few hundred messages. `CLAUDE.md` rules out Redis and message brokers.
 
 ## Decision
 
@@ -46,9 +46,9 @@ PostgreSQL 16 with pgvector holds everything: domain data, corpus, queue, rate-l
 
 A transaction-mode pooler does not keep a session, so `LISTEN` behind it silently stops receiving. Locally, both strings point to the same server.
 
-### 4. Managed Postgres must not auto-suspend
+### 4. Postgres must never auto-suspend
 
-Scale-to-zero drops the `LISTEN` connection, and a cold start eats into the 4 s p95 budget of the web. The provider chosen in ADR-0003 must let us disable suspension. EF-18 checks this and runs a `LISTEN` test over the direct connection in production.
+Scale-to-zero drops the `LISTEN` connection, and a cold start eats into the 4 s p95 budget of the web. Production runs Postgres in a container on an always-on VM (ADR-0003), so nothing suspends it. A move to a managed provider (plan B in ADR-0003) must let us disable suspension. EF-18 runs a `LISTEN` test over the direct connection in production.
 
 ### 5. Exact similarity search
 
@@ -56,7 +56,7 @@ The query is `ORDER BY embedding <=> :q LIMIT :k`, over rows with `split = 'inde
 
 Access goes through a `SimilarityIndex` interface. HNSW can be added when measurements justify it. That change alters the manifest and needs its own ADR.
 
-### 6. Roles and extension bootstrap (proposed; pending owner confirmation)
+### 6. Roles and extension bootstrap
 
 Two roles:
 
@@ -72,7 +72,7 @@ A migration run by `esfake_owner` can do neither. So a bootstrap SQL script, run
 
 - In Docker Compose, through the Postgres image's init directory.
 - In integration tests (testcontainers), with the same script.
-- In managed Postgres, as a documented one-time step (EF-18).
+- In production, through the same init directory of the Postgres container on the VM. On a managed provider (plan B), it becomes a documented one-time step.
 
 The first Alembic migration keeps `CREATE EXTENSION IF NOT EXISTS vector`. It does nothing where the bootstrap already ran, and it still works on providers that allow the database owner to create the extension.
 
@@ -90,7 +90,7 @@ The first Alembic migration keeps `CREATE EXTENSION IF NOT EXISTS vector`. It do
 - Postgres bounds queue throughput. This is fine for the pilot; usage reports (EF-27) will show if that changes.
 - At-least-once delivery means a user can, rarely, get a duplicate reply.
 - The hosting choice is constrained. It needs pgvector, direct connections and no auto-suspension.
-- One manual bootstrap step exists outside Alembic for managed Postgres.
+- Self-hosting Postgres makes upgrades, monitoring and backups our job (ADR-0003). On a managed provider, one manual bootstrap step would sit outside Alembic.
 
 ## Verification
 
