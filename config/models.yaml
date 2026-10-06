@@ -1,0 +1,8 @@
+# Models loaded by the API (ADR-0003, ADR-0004). Any change here changes the pipeline manifest
+# and the CI model cache key.
+embedding:
+  name: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+  runtime: fastembed
+  dimensions: 384
+spacy:
+  name: null # chosen in EF-06 by recall against the 150 ms stage budget (ADR-0004)
