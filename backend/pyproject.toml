@@ -62,9 +62,9 @@ python_version = "3.14"
 files = ["src", "tests"]
 plugins = ["pydantic.mypy"]
 
-# pgvector and asyncpg ship no type information (no py.typed marker).
+# pgvector, asyncpg and onnxruntime ship no type information (no py.typed marker).
 [[tool.mypy.overrides]]
-module = ["pgvector.*", "asyncpg.*"]
+module = ["pgvector.*", "asyncpg.*", "onnxruntime.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

@@ -27,7 +27,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Model weights ship inside the image; containers never download them (ADR-0003 §1).
 COPY config ./config
 RUN ESFAKE_CONFIG_DIR=/app/config ESFAKE_MODELS_DIR=/app/models \
-    /app/.venv/bin/esfake download-models
+    /app/.venv/bin/esfake download-models \
+ && chmod -R a+rX /app/models
 
 FROM ${PYTHON_IMAGE} AS runtime
 RUN useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin esfake

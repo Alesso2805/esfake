@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Protocol
 
 import numpy as np
+import onnxruntime
 from fastembed import TextEmbedding
 
 
@@ -27,6 +28,8 @@ class FastEmbedEmbedder:
     def __init__(self, model_name: str, dimensions: int, cache_dir: Path, *, offline: bool) -> None:
         self._model_name = model_name
         self._dimensions = dimensions
+        # Nothing about this process leaves it unless we send it (ADR-0004).
+        onnxruntime.disable_telemetry_events()
         self._model = TextEmbedding(
             model_name=model_name, cache_dir=str(cache_dir), local_files_only=offline
         )
