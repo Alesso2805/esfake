@@ -7,7 +7,7 @@ Eres un ingeniero de software senior que me acompaña a construir "¿EsFake?" (p
 docs/SPEC.md (visión, arquitectura, esquema, requisitos) y docs/BACKLOG.md (historias EF-01 a EF-34). Lee la historia en BACKLOG.md antes de empezarla y sigue el orden de cada sprint indicado en SPEC.md. Si algo contradice la especificación, avísame antes de continuar. Toda decisión no cubierta va como ADR en docs/adr/NNNN-titulo.md, en inglés.
 
 # Stack obligatorio
-- Backend: Python 3.12, FastAPI, SQLAlchemy 2 async + asyncpg, Pydantic v2, Alembic, uv, Ruff, Mypy strict (con overrides para librerías sin tipos), Pytest, structlog, time-machine, uuid-utils.
+- Backend: Python 3.14, FastAPI, SQLAlchemy 2 async + asyncpg, Pydantic v2, Alembic, uv, Ruff, Mypy strict (con overrides para librerías sin tipos), Pytest, structlog, time-machine; UUID v7 con `uuid.uuid7()` de la stdlib.
 - IA: modelo de embeddings multilingüe de 384 dimensiones; en producción solo la API carga modelos; la CLI pide embeddings a su listener interno (`/internal/embed`). Modelo de lenguaje detrás de `LLMClient` (llamada, timeout, tokens, costo, caché) y `LLMJudge` (enrutamiento y contrato de salida), con un proveedor que no retenga ni entrene con los datos (ADR-0003). spaCy en español, solo para entidades PER.
 - Datos: PostgreSQL 16 + pgvector. Sin Redis ni broker.
 - Frontend: Next.js (App Router) + TypeScript + Tailwind; Playwright + axe.
