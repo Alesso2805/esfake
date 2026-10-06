@@ -96,3 +96,33 @@ def download_models() -> None:
     embedding = load_models_config(settings.config_dir).embedding
     download_model(embedding.name, settings.models_dir)
     typer.echo(f"Downloaded {embedding.name} into {settings.models_dir}.")
+
+
+worker_app = typer.Typer(no_args_is_help=True, help="Background workers.")
+app.add_typer(worker_app, name="worker")
+
+
+@worker_app.command("channels")
+def worker_channels() -> None:
+    """Wake on queue notifications over a direct connection (ADR-0002 §2)."""
+    from esfake.shared.config import ChannelWorkerSettings
+    from esfake.shared.logging import configure_logging
+    from esfake.workers import run_until_signal
+    from esfake.workers.channels import ChannelWorker, asyncpg_dsn, log_wake
+
+    configure_logging()
+    settings = ChannelWorkerSettings()
+    worker = ChannelWorker(asyncpg_dsn(settings.database_direct_url.get_secret_value()), log_wake)
+    asyncio.run(run_until_signal(worker.run))
+
+
+@worker_app.command("maintenance")
+def worker_maintenance() -> None:
+    """Run the periodic maintenance jobs with the system clock."""
+    from esfake.shared.clock import SystemClock
+    from esfake.shared.logging import configure_logging
+    from esfake.workers import run_until_signal
+    from esfake.workers.maintenance import MaintenanceWorker
+
+    configure_logging()
+    asyncio.run(run_until_signal(MaintenanceWorker(SystemClock(), jobs=()).run))
