@@ -1,0 +1,96 @@
+# `make up` (docker compose up --build --wait) starts everything with no manual step.
+# Every secret defaults to a "dev-insecure" value so local runs need no setup; with
+# ESFAKE_ENV=production the services refuse to start until each one is replaced (see .env.example).
+name: esfake
+
+x-backend: &backend
+  build:
+    context: .
+    dockerfile: backend/Dockerfile
+  image: esfake-backend:local
+  environment:
+    ESFAKE_ENV: ${ESFAKE_ENV:-development}
+    # Runtime role. No pooler here, so the direct URL is the same server (ADR-0002 §3).
+    DATABASE_URL: postgresql+asyncpg://esfake_app:${ESFAKE_APP_PASSWORD:-dev-insecure-app}@db:5432/esfake
+    DATABASE_DIRECT_URL: postgresql+asyncpg://esfake_app:${ESFAKE_APP_PASSWORD:-dev-insecure-app}@db:5432/esfake
+    # Owner role, used only by the migrate service.
+    MIGRATIONS_DATABASE_URL: postgresql+asyncpg://esfake_owner:${ESFAKE_OWNER_PASSWORD:-dev-insecure-owner}@db:5432/esfake
+    ESFAKE_INTERNAL_SECRET: ${ESFAKE_INTERNAL_SECRET:-dev-insecure-internal-secret}
+    ESFAKE_TRUSTED_PROXIES: ${ESFAKE_TRUSTED_PROXIES:-}
+
+services:
+  db:
+    image: pgvector/pgvector:0.8.7-pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev-insecure-postgres}
+      POSTGRES_DB: esfake
+      # Read by the bootstrap script on first start only (ADR-0002 §6).
+      ESFAKE_OWNER_PASSWORD: ${ESFAKE_OWNER_PASSWORD:-dev-insecure-owner}
+      ESFAKE_APP_PASSWORD: ${ESFAKE_APP_PASSWORD:-dev-insecure-app}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/migrations/bootstrap:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Over TCP, so it fails while the init scripts run on the socket-only temporary server.
+      test: ["CMD-SHELL", "pg_isready --host 127.0.0.1 --username postgres --dbname esfake"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    <<: *backend
+    command: ["sh", "-c", "alembic upgrade head && esfake seed-modalities /app/config/modalities.yaml"]
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *backend
+    command: ["esfake", "serve"]
+    ports:
+      - "127.0.0.1:8000:8000" # public listener: the only published port
+    expose:
+      - "8001" # internal listener: reachable on the Compose network, never published
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # Readiness: 200 only once the embedding model is loaded.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 120s
+
+  worker-channels:
+    <<: *backend
+    command: ["esfake", "worker", "channels"]
+    depends_on:
+      api:
+        condition: service_healthy
+
+  worker-maintenance:
+    <<: *backend
+    command: ["esfake", "worker", "maintenance"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    image: esfake-web:local
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  pgdata:
