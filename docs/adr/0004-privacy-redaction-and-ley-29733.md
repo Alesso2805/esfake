@@ -86,3 +86,50 @@ This ADR is a technical decision, not legal advice. A lawyer's review is desirab
 - Ley N.° 29733, Ley de Protección de Datos Personales.
 - Decreto Supremo N.° 016-2024-JUS: https://www.gob.pe/institucion/anpd/campa%C3%B1as/128319-nuevo-reglamento-de-proteccion-de-datos-personales
 - MINJUSDH announcement: https://www.gob.pe/institucion/minjus/noticias/1067368-ejecutivo-aprueba-nuevo-reglamento-de-la-ley-de-proteccion-de-datos-personales
+
+## Amendment 1 (2026-10-06): name-redaction floor, set after EF-06
+
+### Method change: precision is measured too
+
+The first measurement showed that the recogniser also takes sentence-initial verbs and other words for names ("Depositale", "Quedaste", "Mañana"). Each false `[NAME]` erases a word the rules may need, and "Depositale" is itself a scam signal. Precision is therefore reported next to recall, defined as the share of name spans that cover a real name.
+
+### Sets
+
+- **Development set** (`evals/redaction/names.jsonl`): 156 messages, 210 names. Used to choose the model and to design the filters.
+- **Validation set** (`evals/redaction/names_validation.jsonl`): 103 messages, 120 names. It uses other phrasings and other name pools, was written before any measurement on it and was never used for tuning.
+
+Both sets are synthetic. The generator is `evals/redaction/generate_names.py`, and every name is an invented combination of common Peruvian first names and surnames.
+
+### Development measurements, used to choose
+
+| Model | Recall | Precision | p95 |
+| --- | --- | --- | --- |
+| es_core_news_sm | 70.5 % | not measured | 3.5 ms |
+| es_core_news_md | 83.3 % | 82.2 % | 4.0 ms |
+| es_core_news_lg | 86.7 % | 77.8 % | 3.6 ms |
+| md, entity kept only if it contains a proper noun | 81.9 % | 95.8 % | 4.0 ms |
+| lg, entity kept only if it contains a proper noun | 86.2 % | 89.3 % | 4.1 ms |
+
+### Decision (owner, 2026-10-06)
+
+- **Model.** `es_core_news_lg` 3.8.0 on spaCy 3.8.16, running tok2vec, morphologizer and ner. A PER entity counts only if it contains a proper noun (PROPN).
+- **Cue phrases.** A deterministic rule catches capitalised names right after cue phrases such as "soy", "hola", "felicidades", "mi nombre es", "te escribe" and "Sr./Sra./Dr./Ing./Lic.". It skips kinship and generic words ("Mamá", "Tía", "cliente", "Dios"). The rule was kept only because it raised recall on the validation set without lowering precision.
+- **Brands.** Official brands from `config/official_domains.yaml` and `config/modalities.yaml` are always kept. They were 100 % kept on both sets.
+
+### Validation measurements, which set the floor
+
+| Variant | Recall (Wilson 95 % lower bound) | Precision | Negatives with a false `[NAME]` | p95 |
+| --- | --- | --- | --- | --- |
+| lg with the PROPN filter | 85.0 % (77.5 %) | 82.6 % | 2 of 7 | 9.0 ms |
+| **lg with the PROPN filter and cue phrases** | **95.8 % (90.6 %)** | **84.1 %** | 3 of 7 | 9.9 ms |
+
+### Floor
+
+`name_recall_floor = 0.90`. It is the 90.6 % lower bound rounded down, stored in `config/thresholds.yaml`. CI fails if recall on the validation set drops below it (`test_name_recall_on_validation_meets_the_floor`).
+
+### Known limits, declared and left untuned so the validation set stays clean
+
+- **False positives seen on validation:** "Su", "Atte", "Jefe de Créditos", "Papá", "Feliz Navidad", "Gracias Dios" and "Lima".
+- **Lowercase names** such as "oye ximena" are mostly missed.
+- **Real messages.** The sets are synthetic and written by the developer, so recall on real messages may be lower. The floor must be re-measured on real donated and public messages (EF-09) with a fresh validation set.
+- **Image size.** The lg model adds about 550 MB to the backend image and to its memory use.
