@@ -12,6 +12,7 @@ import uvicorn
 from esfake.api.internal import create_internal_app
 from esfake.api.main import create_public_app
 from esfake.api.state import ModelState
+from esfake.pipeline.redaction import Redactor
 from esfake.pipeline.similarity.embedder import Embedder
 from esfake.shared.config import ApiSettings
 
@@ -58,10 +59,14 @@ async def run_servers(*servers: uvicorn.Server) -> None:
     await asyncio.gather(*tasks)
 
 
-async def serve(settings: ApiSettings, embedder_factory: Callable[[], Embedder]) -> None:
+async def serve(
+    settings: ApiSettings,
+    embedder_factory: Callable[[], Embedder],
+    redactor_factory: Callable[[], Redactor],
+) -> None:
     state = ModelState()
     public, internal = build_servers(settings, state)
-    loading = asyncio.create_task(state.load(embedder_factory))
+    loading = asyncio.create_task(state.load(embedder_factory, redactor_factory))
     try:
         await run_servers(public, internal)
     finally:

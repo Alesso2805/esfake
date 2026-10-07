@@ -11,6 +11,7 @@ import uvicorn
 from esfake.api.internal import SECRET_HEADER
 from esfake.api.serve import build_servers, run_servers
 from esfake.api.state import ModelState
+from esfake.pipeline.redaction import Redactor
 from esfake.shared.config import ApiSettings
 from tests.fakes import FakeEmbedder
 
@@ -63,7 +64,7 @@ async def test_listeners_share_the_loaded_model(running_api: RunningApi) -> None
     async with httpx.AsyncClient() as client:
         assert (await client.get(f"{running_api.public_url}/readyz")).status_code == 503
 
-        await running_api.state.load(FakeEmbedder)
+        await running_api.state.load(FakeEmbedder, Redactor)
 
         assert (await client.get(f"{running_api.public_url}/readyz")).status_code == 200
         embed = await client.post(

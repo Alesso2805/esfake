@@ -7,6 +7,7 @@ from pydantic import SecretStr
 from esfake.api.internal import SECRET_HEADER, create_internal_app
 from esfake.api.main import create_public_app
 from esfake.api.state import ModelState
+from esfake.pipeline.redaction import Redactor
 from tests.fakes import FakeEmbedder
 
 SECRET = "internal-test-secret"  # noqa: S105
@@ -41,7 +42,7 @@ async def test_liveness_answers_while_the_model_loads(public: httpx.AsyncClient)
 async def test_readiness_waits_for_the_model(public: httpx.AsyncClient, state: ModelState) -> None:
     assert (await public.get("/readyz")).status_code == 503
 
-    await state.load(FakeEmbedder)
+    await state.load(FakeEmbedder, Redactor)
 
     assert (await public.get("/readyz")).status_code == 200
 
@@ -52,7 +53,7 @@ async def test_failed_model_load_keeps_readiness_down(
     def broken() -> FakeEmbedder:
         raise RuntimeError("weights missing")
 
-    await state.load(broken)
+    await state.load(broken, Redactor)
 
     assert (await public.get("/readyz")).status_code == 503
 
@@ -75,7 +76,7 @@ async def test_embed_is_unavailable_until_the_model_loads(internal: httpx.AsyncC
 async def test_embed_returns_one_vector_per_text(
     internal: httpx.AsyncClient, state: ModelState
 ) -> None:
-    await state.load(FakeEmbedder)
+    await state.load(FakeEmbedder, Redactor)
 
     response = await internal.post(
         "/internal/embed", json={"texts": ["hola", "chau"]}, headers=AUTH

@@ -69,12 +69,21 @@ def serve() -> None:
     """Run the API: public and internal listeners on one event loop (CLAUDE.md rule 9)."""
     # Imported here so the other commands never load FastAPI or the model runtime.
     from esfake.api.serve import serve as serve_api
+    from esfake.pipeline.redaction import Redactor
+    from esfake.pipeline.redaction.names import SpacyNameFinder
     from esfake.pipeline.similarity.embedder import FastEmbedEmbedder
+    from esfake.shared.brands import exempt_terms
     from esfake.shared.logging import configure_logging
 
     configure_logging()
     settings = ApiSettings()
-    embedding = load_models_config(settings.config_dir).embedding
+    models = load_models_config(settings.config_dir)
+    embedding, spacy_model = models.embedding, models.spacy.name
+    if spacy_model is None:
+        raise typer.BadParameter("config/models.yaml names no spaCy model")
+
+    def load_redactor() -> Redactor:
+        return Redactor(SpacyNameFinder(spacy_model, exempt_terms(settings.config_dir)))
 
     def load_embedder() -> FastEmbedEmbedder:
         return FastEmbedEmbedder(
@@ -84,7 +93,7 @@ def serve() -> None:
             offline=settings.models_offline,
         )
 
-    asyncio.run(serve_api(settings, load_embedder))
+    asyncio.run(serve_api(settings, load_embedder, load_redactor))
 
 
 @app.command("download-models")
