@@ -4,7 +4,15 @@
 warning and exit 0 so `make` targets and CI can call them from Sprint 0 on.
 """
 
+import asyncio
+from pathlib import Path
+from typing import Annotated
+
 import typer
+
+from esfake.corpus.modalities import ModalityCatalog, load_catalog, sync_modalities
+from esfake.shared.config import MigrationSettings
+from esfake.shared.db import create_engine
 
 app = typer.Typer(no_args_is_help=True, help="¿EsFake? command-line tools.")
 
@@ -33,3 +41,23 @@ def eval_record() -> None:
 def redteam() -> None:
     """Run the `redteam/dev` attack suite (EF-17)."""
     _warn_stub("redteam", "EF-17")
+
+
+@app.command("seed-modalities")
+def seed_modalities(
+    catalog: Annotated[
+        Path, typer.Argument(exists=True, dir_okay=False, help="Path to config/modalities.yaml.")
+    ],
+) -> None:
+    """Upsert the modality catalogue as esfake_owner (MIGRATIONS_DATABASE_URL)."""
+    loaded = load_catalog(catalog)
+    asyncio.run(_seed_modalities(loaded))
+    typer.echo(f"Seeded {len(loaded.modalities)} modalities.")
+
+
+async def _seed_modalities(catalog: ModalityCatalog) -> None:
+    engine = create_engine(MigrationSettings().migrations_database_url.get_secret_value())
+    try:
+        await sync_modalities(engine, catalog)
+    finally:
+        await engine.dispose()

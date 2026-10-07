@@ -1,0 +1,40 @@
+# Scam modalities (docs/SPEC.md, Modalidades). Codes are stable keys shared by every environment;
+# `esfake seed-modalities` upserts them into the `modalities` table. Guidance texts arrive with the
+# templates in EF-16.
+modalities:
+  - code: family_emergency
+    kind: textual
+    name_es: Familiar en apuros
+    name_en: Relative in trouble
+  - code: fake_prize
+    kind: textual
+    name_es: Falso premio o sorteo
+    name_en: Fake prize or raffle
+  - code: bank_wallet_phishing
+    kind: textual
+    name_es: Suplantación de banco o billetera
+    name_en: Bank or wallet impersonation
+  - code: whatsapp_code_theft
+    kind: textual
+    name_es: Falso soporte que pide el código de WhatsApp
+    name_en: Fake support asking for the WhatsApp code
+  - code: fake_job_offer
+    kind: textual
+    name_es: Falsa oferta de empleo
+    name_en: Fake job offer
+  - code: advance_fee_loan
+    kind: textual
+    name_es: Falso préstamo con pago adelantado
+    name_en: Fake loan with an upfront fee
+  - code: fake_online_sale
+    kind: textual
+    name_es: Venta falsa en redes sociales
+    name_en: Fake sale on social media
+  - code: fake_payment_receipt
+    kind: guidance_only
+    name_es: Comprobante falso de Yape o Plin
+    name_en: Fake Yape or Plin payment receipt
+  - code: virtual_kidnapping
+    kind: guidance_only
+    name_es: Secuestro virtual
+    name_en: Virtual kidnapping
