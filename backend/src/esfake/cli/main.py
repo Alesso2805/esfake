@@ -126,3 +126,38 @@ def worker_maintenance() -> None:
 
     configure_logging()
     asyncio.run(run_until_signal(MaintenanceWorker(SystemClock(), jobs=()).run))
+
+
+@app.command("redaction-report")
+def redaction_report(
+    dataset: Annotated[
+        Path, typer.Option(exists=True, dir_okay=False, help="Labelled names (JSONL).")
+    ] = Path("../evals/redaction/names_validation.jsonl"),
+    model: Annotated[
+        str | None, typer.Option(help="spaCy model; defaults to config/models.yaml.")
+    ] = None,
+) -> None:
+    """Measure name-redaction recall against the floor, and brand survival (ADR-0004 §2)."""
+    import dataclasses
+    import json
+
+    from esfake.evaluation.redaction import evaluate, load_cases
+    from esfake.pipeline.redaction.names import SpacyNameFinder
+    from esfake.shared.brands import exempt_terms
+    from esfake.shared.thresholds import load_thresholds
+
+    settings = ModelSettings()
+    name = model or load_models_config(settings.config_dir).spacy.name
+    if name is None:
+        raise typer.BadParameter("config/models.yaml names no spaCy model; pass --model")
+    finder = SpacyNameFinder(name, exempt_terms(settings.config_dir))
+    report = evaluate(finder, load_cases(dataset))
+    floor = load_thresholds(settings.config_dir).redaction.name_recall_floor
+    summary = {
+        "model": name,
+        "dataset": str(dataset),
+        "name_recall_floor": floor,
+        "meets_floor": report.recall >= floor,
+        **dataclasses.asdict(report),
+    }
+    typer.echo(json.dumps(summary, indent=2))

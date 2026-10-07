@@ -5,4 +5,5 @@ embedding:
   runtime: fastembed
   dimensions: 384
 spacy:
-  name: null # chosen in EF-06 by recall against the 150 ms stage budget (ADR-0004)
+  # Chosen in EF-06 by recall on the validation set, within the 150 ms budget (ADR-0004).
+  name: es_core_news_lg

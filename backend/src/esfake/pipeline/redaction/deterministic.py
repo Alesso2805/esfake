@@ -31,11 +31,11 @@ _LIMA_LANDLINE = re.compile(r"\d{3}[ -]\d{4}")
 # "de / de la / del" particle, initials such as "P.". A word never runs into "/", so the
 # currency in "S/ 50" is not taken for an initial.
 _NAME_WORD = r"[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñü']*\.?(?![/\w])"
-_NAME = rf"{_NAME_WORD}(?:\s+(?:(?:de|del|de la|de los)\s+)?{_NAME_WORD}){{0,4}}"
+NAME_PATTERN = rf"{_NAME_WORD}(?:\s+(?:(?:de|del|de la|de los)\s+)?{_NAME_WORD}){{0,4}}"
 # Only the trigger phrase ignores case; the name itself must be capitalised.
 _YAPE_HOLDER = re.compile(
     r"(\b(?i:a nombre de|titular(?: de la cuenta)?:?|beneficiario:?|te yape[oó]|"
-    rf"yap[eé]ale a|yapea(?:me|le)? a)\s+)({_NAME})"
+    rf"yap[eé]ale a|yapea(?:me|le)? a)\s+)({NAME_PATTERN})"
 )
 
 

@@ -19,6 +19,8 @@ class ModalitySpec(BaseModel):
     kind: Literal["textual", "guidance_only"]
     name_es: str = Field(min_length=1)
     name_en: str = Field(min_length=1)
+    # Brand names tied to the modality; exempt from name redaction, not stored in the table.
+    brands: tuple[str, ...] = ()
 
 
 class ModalityCatalog(BaseModel):
@@ -45,7 +47,7 @@ async def sync_modalities(engine: AsyncEngine, catalog: ModalityCatalog) -> None
     """
     async with engine.begin() as conn:
         for spec in catalog.modalities:
-            values = spec.model_dump()
+            values = spec.model_dump(exclude={"brands"})
             statement = insert(Modality).values(**values, is_active=True)
             await conn.execute(
                 statement.on_conflict_do_update(

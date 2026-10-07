@@ -1,0 +1,73 @@
+# Official brands, their names and domains.
+# Used now as the exemption list of name redaction (ADR-0004: "BCP" or "Yape" must survive) and
+# later by URL analysis to detect lookalike domains (ADR-0005, EF-12).
+#
+# DRAFT pending owner review (EF-06). Every domain must be checked against the brand's own site
+# before EF-12 relies on it; empty lists mark domains not verified yet.
+brands:
+  - name: BCP
+    aliases: [BCP, Banco de Crédito, Banco de Crédito del Perú, ViaBCP]
+    domains: [viabcp.com]
+  - name: Interbank
+    aliases: [Interbank]
+    domains: [interbank.pe]
+  - name: BBVA
+    aliases: [BBVA, BBVA Continental]
+    domains: [bbva.pe]
+  - name: Scotiabank
+    aliases: [Scotiabank]
+    domains: [scotiabank.com.pe]
+  - name: Banco de la Nación
+    aliases: [Banco de la Nación]
+    domains: [bn.com.pe]
+  - name: BanBif
+    aliases: [BanBif]
+    domains: [banbif.com.pe]
+  - name: Banco Pichincha
+    aliases: [Banco Pichincha, Pichincha]
+    domains: [pichincha.pe]
+  - name: Mibanco
+    aliases: [Mibanco]
+    domains: [mibanco.com.pe]
+  - name: Banco Falabella
+    aliases: [Banco Falabella, Falabella]
+    domains: [bancofalabella.pe]
+  - name: Banco Ripley
+    aliases: [Banco Ripley, Ripley]
+    domains: [bancoripley.com.pe]
+  - name: Caja Arequipa
+    aliases: [Caja Arequipa]
+    domains: [cajaarequipa.pe]
+  - name: Caja Huancayo
+    aliases: [Caja Huancayo]
+    domains: [cajahuancayo.com.pe]
+  - name: Caja Piura
+    aliases: [Caja Piura]
+    domains: [cajapiura.pe]
+  - name: Yape
+    aliases: [Yape]
+    domains: [yape.com.pe]
+  - name: Plin
+    aliases: [Plin]
+    domains: []
+  - name: Tunki
+    aliases: [Tunki]
+    domains: []
+  - name: WhatsApp
+    aliases: [WhatsApp]
+    domains: [whatsapp.com, wa.me]
+  - name: SUNAT
+    aliases: [SUNAT]
+    domains: [sunat.gob.pe]
+  - name: RENIEC
+    aliases: [RENIEC]
+    domains: [gob.pe]
+  - name: PNP
+    aliases: [PNP, Policía Nacional, Policía Nacional del Perú]
+    domains: [gob.pe]
+  - name: EsSalud
+    aliases: [EsSalud]
+    domains: []
+  - name: Infocorp
+    aliases: [Infocorp, Equifax]
+    domains: []
