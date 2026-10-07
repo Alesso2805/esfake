@@ -30,6 +30,14 @@ APP_PASSWORD = "app-test-only"  # noqa: S105
 class Database:
     host: str
     port: int
+    container: PostgresContainer
+
+    def dump(self) -> str:
+        """Plain-SQL dump of the whole database, as an attacker with a backup would see it."""
+        result = self.container.exec(["pg_dump", "--username", "postgres", DATABASE_NAME])
+        assert result.exit_code == 0, result.output
+        dump: str = result.output.decode()
+        return dump
 
     def url(self, user: str, password: str) -> str:
         return f"postgresql+asyncpg://{user}:{password}@{self.host}:{self.port}/{DATABASE_NAME}"
@@ -64,7 +72,9 @@ def database() -> Iterator[Database]:
         .with_volume_mapping(str(BOOTSTRAP_DIR), "/docker-entrypoint-initdb.d", "ro")
     )
     with container:
-        db = Database(container.get_container_host_ip(), int(container.get_exposed_port(5432)))
+        db = Database(
+            container.get_container_host_ip(), int(container.get_exposed_port(5432)), container
+        )
         command.upgrade(alembic_config(db.owner_url), "head")
         yield db
 

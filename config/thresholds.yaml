@@ -1,0 +1,9 @@
+# Decision thresholds (CLAUDE.md rule 12). Every change bumps `version`, which goes into the
+# pipeline manifest. Similarity (k, delta), cluster and out-of-distribution thresholds arrive
+# with EF-07, EF-13 and EF-14.
+version: "0.1"
+
+redaction:
+  # ADR-0004 amendment of 2026-10-06: the Wilson 95 % lower bound of name recall on
+  # evals/redaction/names_validation.jsonl with es_core_news_lg (0.906), rounded down.
+  name_recall_floor: 0.90

@@ -1,6 +1,7 @@
 # Scam modalities (docs/SPEC.md, Modalidades). Codes are stable keys shared by every environment;
 # `esfake seed-modalities` upserts them into the `modalities` table. Guidance texts arrive with the
-# templates in EF-16.
+# templates in EF-16. `brands` lists brand names tied to a modality; name redaction never removes
+# them (ADR-0004), together with the aliases in official_domains.yaml.
 modalities:
   - code: family_emergency
     kind: textual
@@ -18,6 +19,7 @@ modalities:
     kind: textual
     name_es: Falso soporte que pide el código de WhatsApp
     name_en: Fake support asking for the WhatsApp code
+    brands: [WhatsApp]
   - code: fake_job_offer
     kind: textual
     name_es: Falsa oferta de empleo
@@ -34,6 +36,7 @@ modalities:
     kind: guidance_only
     name_es: Comprobante falso de Yape o Plin
     name_en: Fake Yape or Plin payment receipt
+    brands: [Yape, Plin]
   - code: virtual_kidnapping
     kind: guidance_only
     name_es: Secuestro virtual
