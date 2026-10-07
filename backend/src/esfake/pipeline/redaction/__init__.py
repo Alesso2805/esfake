@@ -1,8 +1,12 @@
 """Stage 1b: redaction (ADR-0004 §1). The only place that turns RawText into RedactedText."""
 
+from pathlib import Path
+
 from esfake.pipeline.redaction.deterministic import redact_deterministic
-from esfake.pipeline.redaction.names import NameFinder, Span
+from esfake.pipeline.redaction.names import NameFinder, SpacyNameFinder, Span
 from esfake.pipeline.text import RawText, RedactedText
+from esfake.shared.brands import exempt_terms
+from esfake.shared.models_config import load_models_config
 
 # Part of every manifest; bump it whenever patterns, models or the exemption list change.
 REDACTOR_VERSION = "2"
@@ -33,3 +37,11 @@ class Redactor:
                 text = text[:start] + NAME_PLACEHOLDER + text[end:]
                 counts["name"] += 1
         return RedactedText(text, dict(counts))
+
+
+def build_redactor(config_dir: Path) -> Redactor:
+    """The production redactor: deterministic patterns plus the spaCy model of models.yaml."""
+    model = load_models_config(config_dir).spacy.name
+    if model is None:
+        raise ValueError("config/models.yaml names no spaCy model")
+    return Redactor(SpacyNameFinder(model, exempt_terms(config_dir)))

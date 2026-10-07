@@ -69,21 +69,16 @@ def serve() -> None:
     """Run the API: public and internal listeners on one event loop (CLAUDE.md rule 9)."""
     # Imported here so the other commands never load FastAPI or the model runtime.
     from esfake.api.serve import serve as serve_api
-    from esfake.pipeline.redaction import Redactor
-    from esfake.pipeline.redaction.names import SpacyNameFinder
+    from esfake.pipeline.redaction import Redactor, build_redactor
     from esfake.pipeline.similarity.embedder import FastEmbedEmbedder
-    from esfake.shared.brands import exempt_terms
     from esfake.shared.logging import configure_logging
 
     configure_logging()
     settings = ApiSettings()
-    models = load_models_config(settings.config_dir)
-    embedding, spacy_model = models.embedding, models.spacy.name
-    if spacy_model is None:
-        raise typer.BadParameter("config/models.yaml names no spaCy model")
+    embedding = load_models_config(settings.config_dir).embedding
 
     def load_redactor() -> Redactor:
-        return Redactor(SpacyNameFinder(spacy_model, exempt_terms(settings.config_dir)))
+        return build_redactor(settings.config_dir)
 
     def load_embedder() -> FastEmbedEmbedder:
         return FastEmbedEmbedder(
@@ -170,3 +165,39 @@ def redaction_report(
         **dataclasses.asdict(report),
     }
     typer.echo(json.dumps(summary, indent=2))
+
+
+corpus_app = typer.Typer(no_args_is_help=True, help="Public corpus: add, review pairs, assign.")
+app.add_typer(corpus_app, name="corpus")
+
+DEFAULT_CORPUS = Path("../evals/datasets/corpus.jsonl")
+
+
+@corpus_app.command("add")
+def corpus_add(
+    raw: Annotated[
+        Path,
+        typer.Argument(
+            exists=True, dir_okay=False, help="CSV or JSONL of raw messages, outside the repo."
+        ),
+    ],
+    corpus: Annotated[Path, typer.Option(help="Corpus JSONL to append to.")] = DEFAULT_CORPUS,
+) -> None:
+    """Redact raw messages and append them to the public corpus (EF-07, EF-09)."""
+    from esfake.corpus.add import CorpusInputError, add_messages, load_raw_rows
+    from esfake.pipeline.redaction import build_redactor
+    from esfake.shared.clock import SystemClock
+
+    settings = ModelSettings()
+    catalog = load_catalog(settings.config_dir / "modalities.yaml")
+    try:
+        rows = load_raw_rows(raw, settings.config_dir.resolve().parent, catalog)
+    except CorpusInputError as error:
+        typer.secho(f"ERROR: {error}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1) from None
+    report = add_messages(rows, corpus, build_redactor(settings.config_dir), SystemClock())
+    typer.echo(
+        f"Added {report.added} messages, skipped {report.duplicates} duplicates. "
+        f"Redacted: {dict(sorted(report.redactions.items()))}."
+    )
+    typer.echo("Review the new lines with `git diff` before committing: redaction is not perfect.")
