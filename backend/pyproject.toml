@@ -1,0 +1,54 @@
+[project]
+name = "esfake"
+version = "0.1.0"
+description = "¿EsFake? — scam message checker for Peru"
+authors = [
+    { name = "Alessandro David", email = "89119823+Alesso2805@users.noreply.github.com" }
+]
+requires-python = ">=3.14,<3.15"
+dependencies = [
+    "typer>=0.27.3",
+]
+
+[project.scripts]
+esfake = "esfake.cli.main:app"
+
+[build-system]
+requires = ["uv_build>=0.11.25,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.4.0",
+    "pytest>=9.1.1",
+    "ruff>=0.16.10",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I", "N", "UP", "B", "S", "C4", "SIM", "PT", "RUF",
+    "ASYNC", # blocking calls inside async code
+    "DTZ",   # naive datetimes; time comes from the injected Clock (CLAUDE.md rule 13)
+    "TID",   # banned imports
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.mypy]
+strict = true
+python_version = "3.14"
+files = ["src", "tests"]
+# Per-library overrides for untyped dependencies go below as
+# [[tool.mypy.overrides]] blocks, each with a reason.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+xfail_strict = true
+filterwarnings = ["error"]
