@@ -6,9 +6,12 @@ warning and exit 0 so `make` targets and CI can call them from Sprint 0 on.
 
 import asyncio
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
+
+if TYPE_CHECKING:
+    from esfake.pipeline.similarity.embedder import FastEmbedEmbedder
 
 from esfake.corpus.modalities import ModalityCatalog, load_catalog, sync_modalities
 from esfake.shared.config import ApiSettings, MigrationSettings, ModelSettings
@@ -201,3 +204,72 @@ def corpus_add(
         f"Redacted: {dict(sorted(report.redactions.items()))}."
     )
     typer.echo("Review the new lines with `git diff` before committing: redaction is not perfect.")
+
+
+DEFAULT_PAIRS = Path("../evals/datasets/cluster_pairs.csv")
+
+
+def _local_embedder() -> FastEmbedEmbedder:
+    """In development and CI the CLI loads the model itself; production uses /internal/embed."""
+    from esfake.pipeline.similarity.embedder import FastEmbedEmbedder
+
+    settings = ModelSettings()
+    embedding = load_models_config(settings.config_dir).embedding
+    return FastEmbedEmbedder(
+        embedding.name, embedding.dimensions, settings.models_dir, offline=settings.models_offline
+    )
+
+
+@corpus_app.command("pairs")
+def corpus_pairs(
+    corpus: Annotated[Path, typer.Option(help="Corpus JSONL.")] = DEFAULT_CORPUS,
+    out: Annotated[Path, typer.Option(help="Spreadsheet to label.")] = DEFAULT_PAIRS,
+    per_bin: Annotated[int, typer.Option(help="Pairs per similarity bin (10 bins).")] = 10,
+    low: Annotated[float, typer.Option(help="Lowest similarity sampled.")] = 0.70,
+    high: Annotated[float, typer.Option(help="Highest similarity sampled.")] = 0.98,
+) -> None:
+    """Sample pairs around the likely cluster threshold for manual review (ADR-0003 §6)."""
+    from esfake.corpus.clusters import cosine_matrix
+    from esfake.corpus.dataset import read_corpus
+    from esfake.corpus.pairs import select_review_pairs, write_pairs
+
+    records = read_corpus(corpus)
+    if len(records) < 2:
+        typer.secho("ERROR: the corpus needs at least two messages", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+    similarities = cosine_matrix(_local_embedder().embed([record.text for record in records]))
+    pairs = select_review_pairs(records, similarities, low=low, high=high, per_bin=per_bin)
+    write_pairs(out, pairs)
+    typer.echo(
+        f"Wrote {len(pairs)} pairs to {out}. In the 'same' column write 'si' when both texts are "
+        f"the same message or a near-duplicate variant, 'no' otherwise; then run "
+        f"`esfake corpus threshold`."
+    )
+
+
+@corpus_app.command("threshold")
+def corpus_threshold(
+    pairs: Annotated[Path, typer.Option(exists=True, help="Labelled pairs.")] = DEFAULT_PAIRS,
+    corpus: Annotated[Path, typer.Option(help="Corpus JSONL.")] = DEFAULT_CORPUS,
+) -> None:
+    """Recommend the cluster threshold from the labelled pairs (ADR-0003 §6)."""
+    from esfake.corpus.clusters import cosine_matrix
+    from esfake.corpus.dataset import read_corpus
+    from esfake.corpus.pairs import choose_threshold, read_labeled_pairs, record_ref
+
+    labeled = read_labeled_pairs(pairs)
+    by_ref = {record_ref(record): record for record in read_corpus(corpus)}
+    refs = sorted({ref for pair in labeled for ref in (pair.ref_a, pair.ref_b)})
+    unknown = [ref for ref in refs if ref not in by_ref]
+    if unknown:
+        typer.secho(f"ERROR: pairs refer to texts not in the corpus: {unknown}", err=True)
+        raise typer.Exit(1)
+    similarities = cosine_matrix(_local_embedder().embed([by_ref[ref].text for ref in refs]))
+    index = {ref: position for position, ref in enumerate(refs)}
+    scored = [(float(similarities[index[p.ref_a], index[p.ref_b]]), p.same) for p in labeled]
+    choice = choose_threshold(scored)
+    typer.echo(
+        f"{choice.pairs} pairs, {choice.same} labelled 'same'. Recommended cluster threshold: "
+        f"{choice.threshold} (F1 {choice.f1:.2f}, agreement {choice.accuracy:.0%}). Record it as "
+        f"corpus.cluster_threshold in config/thresholds.yaml before assigning splits."
+    )
