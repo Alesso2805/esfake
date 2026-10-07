@@ -9,13 +9,13 @@ WEB := npm --prefix web
 help: ## List the available targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-12s %s\n", $$1, $$2}'
 
-up: ## Build and start every service, waiting until healthy (docker-compose.yml arrives in EF-04)
+up: ## Build and start every service, waiting until healthy
 	docker compose up --detach --build --wait
 
-down: ## Stop every service
+down: ## Stop every service (data volume kept; `docker compose down -v` drops it)
 	docker compose down
 
-migrate: ## Apply database migrations (service arrives with EF-03 and EF-04)
+migrate: ## Apply database migrations and seed the modality catalogue
 	docker compose run --rm migrate
 
 lint: ## Ruff, Mypy strict and ESLint
