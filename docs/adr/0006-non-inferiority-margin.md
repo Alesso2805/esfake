@@ -1,6 +1,6 @@
 # ADR-0006: Non-inferiority margin against the LLM-only baseline, and the per-PR regression gate
 
-- Status: Proposed (Decision B pending owner confirmation)
+- Status: Accepted (2026-10-07)
 - Date: 2026-10-06, fixed before any measurement on `test`
 - Deciders: Alessandro David
 - Related: `docs/SPEC.md` (Métricas de éxito, Requisitos de calidad), `CLAUDE.md` rule 11, EF-08, EF-10, EF-15, EF-22, EF-30
@@ -39,7 +39,7 @@ The pipeline also needs a per-PR gate that catches clear regressions on `eval` w
 - **If the interval still crosses −10,** we publish the result as "inconclusive at this sample size", not as non-inferior.
 - **Changes need a new ADR, made before measuring.** A larger `test` set in a later version could justify a tighter margin, but only through a new ADR dated before that measurement. Any change after the first measurement on `test` is published as a deviation.
 
-## Decision B: Per-PR regression gate on `eval` (proposed)
+## Decision B: Per-PR regression gate on `eval`
 
 - **Baseline.** The per-case predictions stored for the latest published version, in `docs/evals/<version>.json` (case_id, level, route). Old code is never run again.
 - **Cases compared.** Only the case_ids present in both datasets. New cases count from the next published version.

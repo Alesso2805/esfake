@@ -1,6 +1,6 @@
 # ADR-0004: Structural privacy, redaction floors and Peru's data protection law
 
-- Status: Proposed
+- Status: Accepted (2026-10-07)
 - Date: 2026-10-06
 - Deciders: Alessandro David
 - Related: `docs/SPEC.md` (Requisitos no funcionales), `CLAUDE.md` rules 4, 5 and 13, ADR-0005, EF-06, EF-19, EF-24, EF-25

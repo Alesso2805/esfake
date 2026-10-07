@@ -1,6 +1,6 @@
 # ADR-0003: Embeddings, LLM provider, threshold calibration and running costs
 
-- Status: Proposed
+- Status: Accepted (2026-10-07)
 - Date: 2026-10-06
 - Deciders: Alessandro David
 - Related: `CLAUDE.md` (Stack obligatorio, rules 11 and 12), ADR-0002, ADR-0004, EF-07, EF-10, EF-13, EF-14, EF-15, EF-18, EF-23, EF-25

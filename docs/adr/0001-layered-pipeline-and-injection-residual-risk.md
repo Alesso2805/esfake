@@ -1,6 +1,6 @@
 # ADR-0001: Layered pipeline with code-only model output and declared injection risk
 
-- Status: Proposed
+- Status: Accepted (2026-10-07)
 - Date: 2026-10-06
 - Deciders: Alessandro David
 - Related: `docs/SPEC.md` (Arquitectura), `CLAUDE.md` rules 1–3, EF-11 to EF-17

@@ -1,6 +1,6 @@
 # ADR-0002: PostgreSQL as job queue and exact vector store
 
-- Status: Proposed
+- Status: Accepted (2026-10-07)
 - Date: 2026-10-06
 - Deciders: Alessandro David
 - Related: `docs/SPEC.md` (Arquitectura, Esquema), `CLAUDE.md` rules 7 and 9, EF-03, EF-04, EF-13, EF-18, EF-23

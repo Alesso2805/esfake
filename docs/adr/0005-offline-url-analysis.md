@@ -1,6 +1,6 @@
 # ADR-0005: URL analysis without network requests
 
-- Status: Proposed
+- Status: Accepted (2026-10-07)
 - Date: 2026-10-06
 - Deciders: Alessandro David
 - Related: `docs/SPEC.md` (Pipeline, Seguridad web), `CLAUDE.md` rule 10, ADR-0004, EF-12, EF-21
