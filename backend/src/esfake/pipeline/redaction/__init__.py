@@ -5,7 +5,7 @@ from esfake.pipeline.redaction.names import NameFinder, Span
 from esfake.pipeline.text import RawText, RedactedText
 
 # Part of every manifest; bump it whenever patterns, models or the exemption list change.
-REDACTOR_VERSION = "1"
+REDACTOR_VERSION = "2"
 NAME_PLACEHOLDER = "[NAME]"
 
 

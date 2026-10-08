@@ -10,6 +10,7 @@ class RedactionThresholds(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     name_recall_floor: float = Field(ge=0, le=1)
+    name_precision_floor: float = Field(ge=0, le=1)
 
 
 class Thresholds(BaseModel):
