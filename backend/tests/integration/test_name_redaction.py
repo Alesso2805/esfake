@@ -28,6 +28,7 @@ def test_name_recall_on_validation_meets_the_floor(finder: SpacyNameFinder) -> N
     report = evaluate(finder, load_cases(NAMES_VALIDATION))
 
     assert report.recall >= load_thresholds(CONFIG_DIR).redaction.name_recall_floor
+    assert report.precision >= load_thresholds(CONFIG_DIR).redaction.name_precision_floor
     assert report.latency_ms_p95 < 150
 
 
@@ -51,3 +52,26 @@ def test_a_sentence_initial_verb_is_not_taken_for_a_name(finder: SpacyNameFinder
     assert redacted.startswith("Deposítale")
     assert "Juan" not in redacted
     assert "Quispe" not in redacted
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        # Opening words of the relative-in-trouble scam are its signal, never a name.
+        ("Papá estoy en la comisaría, me detuvieron por error", None),
+        ("Abuelita soy tu nieto, estoy en problemas", None),
+        ("Hola mami, soy yo, me robaron el cel", None),
+        ("FELICIDADES, Usted ha sido seleccionado para un trabajo a distancia", None),
+        ("Tu pedido de Rappi está en camino", None),
+        (
+            "Hola tío, soy Valeria, estoy en el hospital",
+            "Hola tío, soy [NAME], estoy en el hospital",
+        ),
+    ],
+)
+def test_greetings_kinship_and_brands_survive_while_names_do_not(
+    finder: SpacyNameFinder, text: str, expected: str | None
+) -> None:
+    redacted = Redactor(finder).redact(RawText(text)).value
+
+    assert redacted == (expected or text)

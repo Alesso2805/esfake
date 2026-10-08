@@ -4,6 +4,8 @@
   "Depositale" that the recogniser takes for a person is not erased (it is a scam signal).
 - Cue phrases ("soy X", "Hola X", "Felicidades X") catch the single first names the recogniser
   misses most often, the classic "relative in trouble" opening among them.
+- Greetings, kinship and courtesy words are never a name, whichever path found them: "Papá" or
+  "Abuelita" at the start of a message is the very signal of the relative-in-trouble scam.
 - Official brands from config/official_domains.yaml and config/modalities.yaml always survive.
 
 The recall floor is fixed in an amendment to ADR-0004, measured on
@@ -30,13 +32,26 @@ _CUED_NAME = re.compile(
     r"señor(?:a|ita)?|sr\.|sra\.|srta\.|dr\.|dra\.|ing\.|lic\.)[\s,]+)"
     rf"({NAME_PATTERN})"
 )
-# Capitalised words that follow those cues without being names ("Hola Mamá", "Gracias Dios").
+# Words that are never a person's name, folded (lower-case, no accents). Capitalised at the start
+# of a message, the recogniser and the cue phrases take them for names ("Papá estoy en la
+# comisaría", "Hola Mamá"); redaction v2 trims them from both ends of every candidate.
 _NOT_NAMES = frozenset(
     {
-        "mama", "papa", "mami", "papi", "tia", "tio", "abuela", "abuelita", "abuelo",
-        "abuelito", "hijo", "hija", "amigo", "amiga", "amor", "senor", "senora", "senorita",
-        "cliente", "usuario", "usuaria", "estimado", "estimada", "dios", "todos", "todas",
-        "equipo", "familia", "vecino", "vecina", "jefe", "doctor", "doctora",
+        # greetings and openings
+        "hola", "holi", "hey", "oye", "buenas", "buenos", "buen", "dia", "dias",
+        "tardes", "noches", "saludos", "felicidades", "felicitaciones", "gracias",
+        "atte", "atentamente", "querido", "querida", "estimado", "estimada",
+        # kinship and affection
+        "mama", "mami", "ma", "mamita", "papa", "papi", "pa", "papito", "abuela",
+        "abuelita", "abuelo", "abuelito", "tia", "tio", "tita", "tito", "hermano",
+        "hermana", "hermanito", "hermanita", "primo", "prima", "sobrino", "sobrina",
+        "nieto", "nieta", "hijo", "hija", "hijito", "hijita", "cunado", "cunada",
+        "suegro", "suegra", "compadre", "comadre", "amor", "amigo", "amiga", "familia",
+        # courtesy and roles
+        "usted", "su", "senor", "senora", "senorita", "don", "dona", "joven",
+        "jefe", "jefa", "doctor", "doctora", "profe", "profesor", "profesora",
+        "cliente", "usuario", "usuaria", "vecino", "vecina", "equipo", "todos",
+        "todas", "dios",
     }
 )  # fmt: skip
 
@@ -78,15 +93,25 @@ def _trimmed(text: str, span: Span) -> Span | None:
     return offset, offset + len(trimmed)
 
 
+def _without_non_names(text: str, span: Span) -> Span | None:
+    """Trim greeting, kinship and courtesy words from both ends; None if nothing is left."""
+    start, end = span
+    words = [
+        word
+        for word in re.finditer(r"\S+", text[start:end])
+        if fold(word.group()).strip(".,;:!?\u00a1\u00bf") not in _NOT_NAMES
+    ]
+    if not words:
+        return None
+    return start + words[0].start(), start + words[-1].end()
+
+
 def cued_name_spans(text: str) -> list[Span]:
     """Capitalised names right after a cue phrase, skipping kinship and generic words."""
     spans: list[Span] = []
     for match in _CUED_NAME.finditer(text):
-        start, end = match.span(1)
-        for word in re.finditer(r"\S+", text[start:end]):
-            if fold(word.group()).strip(".,!?") not in _NOT_NAMES:
-                spans.append((start + word.start(), end))
-                break
+        if (span := _without_non_names(text, match.span(1))) is not None:
+            spans.append(span)
     return spans
 
 
@@ -112,11 +137,13 @@ class SpacyNameFinder:
                 tokens = doc.char_span(start, end, alignment_mode="expand") or ()
                 if not any(token.pos_ == "PROPN" for token in tokens):
                     continue
-                if (span := _trimmed(text, (start, end))) is not None:
+                trimmed = _trimmed(text, (start, end))
+                if trimmed is not None and (span := _without_non_names(text, trimmed)):
                     spans.append(span)
         if self._cues:
             for cued in cued_name_spans(text):
                 for piece in _subtract(cued, holes):
-                    if (span := _trimmed(text, piece)) is not None:
+                    trimmed = _trimmed(text, piece)
+                    if trimmed is not None and (span := _without_non_names(text, trimmed)):
                         spans.append(span)
         return spans

@@ -133,3 +133,48 @@ Both sets are synthetic. The generator is `evals/redaction/generate_names.py`, a
 - **Lowercase names** such as "oye ximena" are mostly missed.
 - **Real messages.** The sets are synthetic and written by the developer, so recall on real messages may be lower. The floor must be re-measured on real donated and public messages (EF-09) with a fresh validation set.
 - **Image size.** The lg model adds about 550 MB to the backend image and to its memory use.
+
+## Amendment 2 (2026-10-08): redactor v2, greetings and kinship are never names
+
+### What happened
+
+The first corpus batch (`lote-01`, 144 messages written in a realistic style) went through redactor v1 before entering the corpus. Close to one message in five lost a word that is not a name. The cases were:
+
+- opening greetings and kinship words: "Hola", "Papá", "Mamá", "Abuelita", "Hermano", "Primo", "Tío", "Ma";
+- forms of address and congratulations: "Usted", "Felicitaciones";
+- brands missing from the exemption list: "Rappi", "Sodimac".
+
+"Papá" or "Abuelita" at the start of a message is the very signal of the relative-in-trouble scam, so v1 was erasing what the rules (EF-11) need. The validation set did not show it with this strength because its phrasings were cleaner.
+
+### Change (redactor version 2)
+
+- **A non-name word list.** It covers greetings and openings, kinship and affection, and courtesy and role words. Those words are trimmed from both ends of every candidate name, whether the recogniser or a cue phrase proposed it. A candidate made only of such words is dropped.
+- **More exempt brands.** Common retail, delivery, telecom and utility brands joined `config/official_domains.yaml`. Their domains are left to EF-12.
+- **A precision floor.** Precision is now guarded too, not only reported: `name_precision_floor` in `config/thresholds.yaml`, with the same method as the recall floor.
+
+The word list came from the `lote-01` observations. The validation set was not used to build it.
+
+### Measurements (es_core_news_lg)
+
+| Set | Version | Recall (Wilson lower bound) | Precision (Wilson lower bound) | Negatives with a false `[NAME]` |
+| --- | --- | --- | --- | --- |
+| Development | v1 | 94.8 % (90.9 %) | 91.0 % | 0 of 9 |
+| Development | v2 | 94.8 % (90.9 %) | 97.5 % | 0 of 9 |
+| Validation | v1 | 95.8 % (90.6 %) | 84.1 % | 3 of 7 |
+| Validation | **v2** | **95.8 % (90.6 %)** | **94.5 % (89.6 %)** | 2 of 7 |
+
+On `lote-01`, messages containing `[NAME]` went from 28 to 9. Of the 9, seven are real names; the other two are "Evita", a verb tagged as a proper noun, and "Javier Prado", an avenue named after a person.
+
+### Floors (`config/thresholds.yaml`, version 0.2)
+
+- `name_recall_floor = 0.90`, unchanged.
+- `name_precision_floor = 0.89`: 138 of 146 spans, with a lower bound of 0.896 rounded down.
+
+CI checks both on the validation set.
+
+### Known limits that remain
+
+- **Imperative verbs** tagged as proper nouns, such as "Evita".
+- **Streets and places named after people**, such as "Javier Prado".
+- **Lowercase names.**
+- **Synthetic sets.** Both sets are still synthetic. The floors must be re-measured on real messages (EF-09).

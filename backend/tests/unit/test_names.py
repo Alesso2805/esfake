@@ -3,7 +3,13 @@ from collections.abc import Sequence
 import pytest
 
 from esfake.pipeline.redaction import Redactor
-from esfake.pipeline.redaction.names import Span, _subtract, cued_name_spans, fold
+from esfake.pipeline.redaction.names import (
+    Span,
+    _subtract,
+    _without_non_names,
+    cued_name_spans,
+    fold,
+)
 from esfake.pipeline.text import RawText
 
 
@@ -53,3 +59,22 @@ def test_overlapping_name_spans_become_one_placeholder() -> None:
 
     assert redacted.value == "Soy [NAME]."
     assert redacted.counts == {"name": 1}
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Hola mami", None),
+        ("Papá", None),
+        ("FELICIDADES, Usted", None),
+        ("Abuelita Rosa", "Rosa"),
+        ("Rosa Quispe", "Rosa Quispe"),
+        ("Valeria, tío", "Valeria,"),
+    ],
+)
+def test_greeting_kinship_and_courtesy_words_are_trimmed_from_names(
+    text: str, expected: str | None
+) -> None:
+    span = _without_non_names(text, (0, len(text)))
+
+    assert (text[span[0] : span[1]] if span else None) == expected

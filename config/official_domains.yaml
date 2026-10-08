@@ -71,3 +71,65 @@ brands:
   - name: Infocorp
     aliases: [Infocorp, Equifax]
     domains: []
+  # Retail, delivery, telecom and utility brands often named in genuine and fake messages. Added for
+  # the name-redaction exemption (redactor v2); their domains are verified in EF-12.
+  - name: Rappi
+    aliases: [Rappi]
+    domains: []
+  - name: PedidosYa
+    aliases: [PedidosYa]
+    domains: []
+  - name: Mercado Libre
+    aliases: [Mercado Libre, MercadoLibre]
+    domains: []
+  - name: Olva Courier
+    aliases: [Olva, Olva Courier]
+    domains: []
+  - name: Shalom
+    aliases: [Shalom]
+    domains: []
+  - name: Serpost
+    aliases: [Serpost]
+    domains: []
+  - name: Sodimac
+    aliases: [Sodimac]
+    domains: []
+  - name: Plaza Vea
+    aliases: [Plaza Vea, PlazaVea]
+    domains: []
+  - name: Tottus
+    aliases: [Tottus]
+    domains: []
+  - name: Inkafarma
+    aliases: [Inkafarma]
+    domains: []
+  - name: Cineplanet
+    aliases: [Cineplanet]
+    domains: []
+  - name: Movistar
+    aliases: [Movistar]
+    domains: []
+  - name: Claro
+    aliases: [Claro]
+    domains: []
+  - name: Entel
+    aliases: [Entel]
+    domains: []
+  - name: Bitel
+    aliases: [Bitel]
+    domains: []
+  - name: Luz del Sur
+    aliases: [Luz del Sur]
+    domains: []
+  - name: Enel
+    aliases: [Enel]
+    domains: []
+  - name: Sedapal
+    aliases: [Sedapal]
+    domains: []
+  - name: Cálidda
+    aliases: [Cálidda]
+    domains: []
+  - name: Amazon
+    aliases: [Amazon]
+    domains: []
