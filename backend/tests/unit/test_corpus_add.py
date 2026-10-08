@@ -6,9 +6,10 @@ import pytest
 from esfake.corpus.add import CorpusInputError, add_messages, load_raw_rows
 from esfake.corpus.dataset import CorpusRecord, read_corpus
 from esfake.corpus.modalities import ModalityCatalog, load_catalog
+from esfake.corpus.subcategories import SubcategoryCatalog, load_subcategories
 from esfake.pipeline.redaction import Redactor
 from esfake.shared.clock import FakeClock
-from tests.paths import MODALITIES_YAML
+from tests.paths import CONFIG_DIR, MODALITIES_YAML
 
 HEADER = "text,label,modality,subcategory,source,reference,language\n"
 SCAM = (
@@ -21,6 +22,11 @@ LEGIT = '"Tu pedido llegó a la portería",legit,,delivery_notice,curated_legit,
 @pytest.fixture
 def catalog() -> ModalityCatalog:
     return load_catalog(MODALITIES_YAML)
+
+
+@pytest.fixture
+def subcategories() -> SubcategoryCatalog:
+    return load_subcategories(CONFIG_DIR / "subcategories.yaml")
 
 
 @pytest.fixture
@@ -39,9 +45,9 @@ def _raw(tmp_path: Path, content: str, name: str = "batch.csv") -> Path:
 
 
 def test_rows_are_read_from_a_spreadsheet_csv(
-    tmp_path: Path, repo: Path, catalog: ModalityCatalog
+    tmp_path: Path, repo: Path, catalog: ModalityCatalog, subcategories: SubcategoryCatalog
 ) -> None:
-    rows = load_raw_rows(_raw(tmp_path, HEADER + SCAM + LEGIT), repo, catalog)
+    rows = load_raw_rows(_raw(tmp_path, HEADER + SCAM + LEGIT), repo, catalog, subcategories)
 
     assert [(row.label, row.modality, row.subcategory) for row in rows] == [
         ("scam", "family_emergency", None),
@@ -49,12 +55,14 @@ def test_rows_are_read_from_a_spreadsheet_csv(
     ]
 
 
-def test_raw_files_inside_the_repository_are_refused(repo: Path, catalog: ModalityCatalog) -> None:
+def test_raw_files_inside_the_repository_are_refused(
+    repo: Path, catalog: ModalityCatalog, subcategories: SubcategoryCatalog
+) -> None:
     inside = repo / "batch.csv"
     inside.write_text(HEADER + SCAM, encoding="utf-8")
 
     with pytest.raises(CorpusInputError, match="outside the repository"):
-        load_raw_rows(inside, repo, catalog)
+        load_raw_rows(inside, repo, catalog, subcategories)
 
 
 @pytest.mark.parametrize(
@@ -65,13 +73,20 @@ def test_raw_files_inside_the_repository_are_refused(repo: Path, catalog: Modali
         ('"Comprobante",scam,fake_payment_receipt,,public_alert,,es\n', "textual modalities"),
         ('"Hola",maybe,,easy,curated_legit,,es\n', "invalid label"),
         ('"Hola",legit,,easy,donated,,es\n', "invalid source"),
+        ('"Hola",legit,,gossip,curated_legit,,es\n', "unknown subcategory"),
+        ('"Gana",scam,fake_prize,easy,public_alert,,es\n', "carry no subcategory"),
     ],
 )
 def test_invalid_rows_are_reported_by_number_without_their_text(
-    tmp_path: Path, repo: Path, catalog: ModalityCatalog, row: str, problem: str
+    tmp_path: Path,
+    repo: Path,
+    catalog: ModalityCatalog,
+    subcategories: SubcategoryCatalog,
+    row: str,
+    problem: str,
 ) -> None:
     with pytest.raises(CorpusInputError, match=problem) as error:
-        load_raw_rows(_raw(tmp_path, HEADER + LEGIT + row), repo, catalog)
+        load_raw_rows(_raw(tmp_path, HEADER + LEGIT + row), repo, catalog, subcategories)
 
     assert "row 2" in str(error.value)
     text = row.split('"')[1]
@@ -79,10 +94,10 @@ def test_invalid_rows_are_reported_by_number_without_their_text(
 
 
 def test_messages_are_redacted_before_they_are_written_and_duplicates_skip(
-    tmp_path: Path, repo: Path, catalog: ModalityCatalog
+    tmp_path: Path, repo: Path, catalog: ModalityCatalog, subcategories: SubcategoryCatalog
 ) -> None:
     corpus = repo / "evals" / "datasets" / "corpus.jsonl"
-    rows = load_raw_rows(_raw(tmp_path, HEADER + SCAM + LEGIT), repo, catalog)
+    rows = load_raw_rows(_raw(tmp_path, HEADER + SCAM + LEGIT), repo, catalog, subcategories)
     clock = FakeClock(datetime(2026, 10, 7, 9, 0, tzinfo=UTC))
 
     first = add_messages(rows, corpus, Redactor(), clock)
@@ -113,3 +128,13 @@ def test_corpus_records_enforce_the_schema_rules(fields: dict[str, str], error: 
 
     with pytest.raises(ValueError, match=error):
         CorpusRecord.model_validate(base | fields)
+
+
+def test_the_subcategory_catalogue_marks_every_category_but_easy_as_hard_negative(
+    subcategories: SubcategoryCatalog,
+) -> None:
+    hard = {s.code for s in subcategories.subcategories if s.hard_negative}
+
+    assert "easy" in subcategories.codes
+    assert hard == subcategories.codes - {"easy"}
+    assert len(subcategories.codes) == 10

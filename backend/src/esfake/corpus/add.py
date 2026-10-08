@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from esfake.corpus.dataset import CorpusRecord, Label, Source, read_corpus, write_corpus
 from esfake.corpus.modalities import ModalityCatalog
+from esfake.corpus.subcategories import SubcategoryCatalog
 from esfake.pipeline.normalize import normalize
 from esfake.pipeline.redaction import Redactor
 from esfake.pipeline.text import RawText
@@ -60,7 +61,12 @@ def _rows(path: Path) -> list[dict[str, str | None]]:
     raise CorpusInputError("the raw file must be .csv or .jsonl")
 
 
-def load_raw_rows(path: Path, repo_root: Path, catalog: ModalityCatalog) -> list[RawCorpusRow]:
+def load_raw_rows(
+    path: Path,
+    repo_root: Path,
+    catalog: ModalityCatalog,
+    subcategories: SubcategoryCatalog,
+) -> list[RawCorpusRow]:
     if path.resolve().is_relative_to(repo_root.resolve()):
         raise CorpusInputError(
             "raw messages must live outside the repository, so they can never be committed"
@@ -81,6 +87,10 @@ def load_raw_rows(path: Path, repo_root: Path, catalog: ModalityCatalog) -> list
             problems.append(f"row {number}: unknown or non-textual modality")
         elif row.label == "legit" and row.subcategory is None:
             problems.append(f"row {number}: a legitimate message needs a subcategory")
+        elif row.label == "legit" and row.subcategory not in subcategories.codes:
+            problems.append(f"row {number}: unknown subcategory (config/subcategories.yaml)")
+        elif row.label == "scam" and row.subcategory is not None:
+            problems.append(f"row {number}: scams carry no subcategory")
         else:
             rows.append(row)
     if problems:

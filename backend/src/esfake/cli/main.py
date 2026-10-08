@@ -188,13 +188,19 @@ def corpus_add(
 ) -> None:
     """Redact raw messages and append them to the public corpus (EF-07, EF-09)."""
     from esfake.corpus.add import CorpusInputError, add_messages, load_raw_rows
+    from esfake.corpus.subcategories import load_subcategories
     from esfake.pipeline.redaction import build_redactor
     from esfake.shared.clock import SystemClock
 
     settings = ModelSettings()
     catalog = load_catalog(settings.config_dir / "modalities.yaml")
     try:
-        rows = load_raw_rows(raw, settings.config_dir.resolve().parent, catalog)
+        rows = load_raw_rows(
+            raw,
+            settings.config_dir.resolve().parent,
+            catalog,
+            load_subcategories(settings.config_dir / "subcategories.yaml"),
+        )
     except CorpusInputError as error:
         typer.secho(f"ERROR: {error}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1) from None
