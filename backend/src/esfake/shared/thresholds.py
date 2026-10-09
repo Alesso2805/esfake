@@ -22,12 +22,23 @@ class CorpusThresholds(BaseModel):
     cluster_threshold_reviewed: bool
 
 
+class EvaluationThresholds(BaseModel):
+    """ADR-0006 B: absolute floors on `eval`, enforced only when enabled."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    absolute_floors_enabled: bool
+    recall_floor: float = Field(ge=0, le=1)
+    false_positive_ceiling: float = Field(ge=0, le=1)
+
+
 class Thresholds(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     version: str
     redaction: RedactionThresholds
     corpus: CorpusThresholds
+    evaluation: EvaluationThresholds
 
 
 def load_thresholds(config_dir: Path) -> Thresholds:
