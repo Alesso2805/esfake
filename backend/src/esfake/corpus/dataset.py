@@ -12,6 +12,8 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from esfake.shared.db.base import DATASET_VERSION_PATTERN
+
 type Source = Literal["public_alert", "curated_legit", "synthetic"]
 type Label = Literal["scam", "legit"]
 type Split = Literal["index", "eval", "test", "excluded"]
@@ -60,3 +62,34 @@ def write_corpus(path: Path, records: list[CorpusRecord]) -> None:
     lines = [json.dumps(record.model_dump(mode="json"), ensure_ascii=False) for record in records]
     with path.open("w", encoding="utf-8", newline="\n") as handle:
         handle.write("".join(line + "\n" for line in lines))
+
+
+class DatasetInfo(BaseModel):
+    """evals/datasets/dataset.json: the version of the committed splits and what built them.
+
+    The minor version grows with every assignment of new messages. Changing the cluster threshold
+    or the embedding model re-clusters everything, which makes a new major version.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    dataset_version: str = Field(pattern=DATASET_VERSION_PATTERN)
+    cluster_threshold: float
+    embedding_model: str
+    discarded_synthetic: int = Field(default=0, ge=0)
+
+
+def dataset_info_path(corpus_path: Path) -> Path:
+    return corpus_path.with_name("dataset.json")
+
+
+def read_dataset_info(corpus_path: Path) -> DatasetInfo | None:
+    path = dataset_info_path(corpus_path)
+    if not path.exists():
+        return None
+    return DatasetInfo.model_validate_json(path.read_text(encoding="utf-8"))
+
+
+def write_dataset_info(corpus_path: Path, info: DatasetInfo) -> None:
+    with dataset_info_path(corpus_path).open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(info.model_dump_json(indent=2) + "\n")

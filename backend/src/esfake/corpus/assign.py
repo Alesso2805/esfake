@@ -30,7 +30,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from esfake.corpus.clusters import cosine_matrix
-from esfake.corpus.dataset import CorpusRecord, Split
+from esfake.corpus.dataset import CorpusRecord, DatasetInfo, Split
 from esfake.shared.hmac_keys import KeyRing
 
 HELD_OUT_SHARE = 0.15  # each of test and eval; index takes the rest
@@ -202,3 +202,44 @@ def assign(
             report.splits[split] += 1
         result.append(record)
     return result, report
+
+
+class DatasetVersionError(ValueError):
+    pass
+
+
+def unassigned(records: Sequence[CorpusRecord]) -> list[CorpusRecord]:
+    """Clear clusters and splits, keeping case_ids, to re-cluster for a new major version."""
+    return [
+        r.model_copy(update={"cluster_id": None, "split": None, "split_assigned_at": None})
+        for r in records
+    ]
+
+
+def next_dataset_info(
+    info: DatasetInfo | None,
+    *,
+    threshold: float,
+    embedding_model: str,
+    new_major: bool,
+) -> DatasetInfo:
+    """The next version, carrying the count of discarded synthetic messages forward."""
+    if info is None:
+        version = "1.0"
+    elif new_major:
+        version = f"{int(info.dataset_version.split('.')[0]) + 1}.0"
+    elif (info.cluster_threshold, info.embedding_model) != (threshold, embedding_model):
+        raise DatasetVersionError(
+            f"the splits were built with threshold {info.cluster_threshold} and "
+            f"{info.embedding_model}; changing either re-clusters the whole corpus, which is a new "
+            f"major version (rerun with --new-major)"
+        )
+    else:
+        major, minor = info.dataset_version.split(".")
+        version = f"{major}.{int(minor) + 1}"
+    return DatasetInfo(
+        dataset_version=version,
+        cluster_threshold=threshold,
+        embedding_model=embedding_model,
+        discarded_synthetic=info.discarded_synthetic if info is not None else 0,
+    )
