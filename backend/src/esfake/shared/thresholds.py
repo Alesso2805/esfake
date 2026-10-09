@@ -13,11 +13,21 @@ class RedactionThresholds(BaseModel):
     name_precision_floor: float = Field(ge=0, le=1)
 
 
+class CorpusThresholds(BaseModel):
+    """EF-07: near-duplicate cut, used by clustering and by the leak test (CLAUDE.md rule 6)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    cluster_threshold: float = Field(gt=0, le=1)
+    cluster_threshold_reviewed: bool
+
+
 class Thresholds(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     version: str
     redaction: RedactionThresholds
+    corpus: CorpusThresholds
 
 
 def load_thresholds(config_dir: Path) -> Thresholds:
