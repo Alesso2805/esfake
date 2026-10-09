@@ -5,12 +5,14 @@ similarity in EF-13, the judge in EF-14); version 0 has none, so policy v0 sees 
 """
 
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Protocol
 
 from esfake.pipeline.decision.policy_v0 import decide
+from esfake.pipeline.llm.cache import ResponseCache
 from esfake.pipeline.text import RedactedText
 from esfake.pipeline.verdict import Signal, Verdict
-from esfake.shared.thresholds import PolicyV0Thresholds
+from esfake.shared.thresholds import PolicyV0Thresholds, load_thresholds
 
 
 class Verifier(Protocol):
@@ -29,3 +31,9 @@ class Pipeline:
     async def verify(self, message: RedactedText) -> Verdict:
         signals = [signal for detector in self._detectors for signal in detector.detect(message)]
         return decide(signals, self._policy)
+
+
+def build_pipeline(config_dir: Path, judge_cache: ResponseCache) -> Pipeline:
+    """The pipeline of this commit. The judge (EF-14) will answer through `judge_cache`; version
+    0 has no detectors and no judge, so nothing reads it yet."""
+    return Pipeline([], load_thresholds(config_dir).policy_v0)

@@ -30,10 +30,10 @@ lint: ## Ruff, Mypy strict and ESLint
 test: ## Backend tests
 	$(BACKEND) pytest
 
-eval: ## Evaluation gate on `eval` in cached-strict mode (stub until EF-08)
+eval: ## Gate on `eval` in cached-strict mode against the latest docs/evals version
 	$(BACKEND) esfake eval
 
-eval-record: ## Record missing model responses with a budget (stub until EF-08)
+eval-record: ## Record missing model responses (US$5 budget), then run the gate without them
 	$(BACKEND) esfake eval-record
 
 redteam: ## `redteam/dev` attack suite (stub until EF-17)
