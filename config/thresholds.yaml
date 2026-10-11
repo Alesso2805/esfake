@@ -1,7 +1,7 @@
 # Decision thresholds (CLAUDE.md rule 12). Every change bumps `version`, which goes into the
 # pipeline manifest. Similarity (k, delta) and out-of-distribution thresholds arrive with
 # EF-13 and EF-14.
-version: "0.3"
+version: "0.4"
 
 redaction:
   # ADR-0004 amendments 1 and 2: Wilson 95 % lower bounds on evals/redaction/names_validation.jsonl
@@ -16,3 +16,16 @@ corpus:
   # to run before that. Changing it once splits exist creates a major dataset version.
   cluster_threshold: 0.90
   cluster_threshold_reviewed: false
+
+policy_v0:
+  # EF-08: a provisional threshold on the sum of signal weights, replaced by the policy EF-15
+  # tunes on `eval`. `likely_scam` also needs a modality, or the verdict stays `suspicious`.
+  suspicious_at: 1.0
+  likely_scam_at: 3.0
+
+evaluation:
+  # ADR-0006 B: absolute floors on `eval`. They turn on with the first version published after
+  # EF-15; until then the gate relies on the paired comparison alone.
+  absolute_floors_enabled: false
+  recall_floor: 0.85
+  false_positive_ceiling: 0.08

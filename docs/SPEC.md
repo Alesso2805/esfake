@@ -254,7 +254,7 @@ esfake/
 │   ├── SPEC.md                   # este documento, sin el backlog
 │   ├── BACKLOG.md
 │   ├── adr/                      # en inglés
-│   ├── evals/                    # <versión>.json por release
+│   ├── evals/                    # <versión>.json: v0, v0.1… por sprint, v1.0 en el release
 │   └── sprints/                  # en español
 ├── deploy/                       # deploy.sh y smoke.sh (ADR-0007)
 ├── .github/workflows/            # ci.yml y cd.yml (ADR-0007)

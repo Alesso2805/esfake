@@ -1,9 +1,10 @@
 """Decision thresholds from config/thresholds.yaml (CLAUDE.md rule 12)."""
 
 from pathlib import Path
+from typing import Self
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class RedactionThresholds(BaseModel):
@@ -22,12 +23,39 @@ class CorpusThresholds(BaseModel):
     cluster_threshold_reviewed: bool
 
 
+class PolicyV0Thresholds(BaseModel):
+    """EF-08: levels from the sum of signal weights, until EF-15."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    suspicious_at: float = Field(gt=0)
+    likely_scam_at: float = Field(gt=0)
+
+    @model_validator(mode="after")
+    def _ordered(self) -> Self:
+        if self.likely_scam_at <= self.suspicious_at:
+            raise ValueError("likely_scam_at must be above suspicious_at")
+        return self
+
+
+class EvaluationThresholds(BaseModel):
+    """ADR-0006 B: absolute floors on `eval`, enforced only when enabled."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    absolute_floors_enabled: bool
+    recall_floor: float = Field(ge=0, le=1)
+    false_positive_ceiling: float = Field(ge=0, le=1)
+
+
 class Thresholds(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     version: str
     redaction: RedactionThresholds
     corpus: CorpusThresholds
+    policy_v0: PolicyV0Thresholds
+    evaluation: EvaluationThresholds
 
 
 def load_thresholds(config_dir: Path) -> Thresholds:
