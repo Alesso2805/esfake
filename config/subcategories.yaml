@@ -1,0 +1,35 @@
+# Subcategories of legitimate corpus messages (EF-07, EF-09). Splits are stratified by them, and
+# every one except `easy` is a hard negative: a legitimate message that looks like a scam.
+# EF-09 asks for at least 40 % of the legitimate messages to be hard negatives.
+# Scams carry no subcategory; they are stratified by modality.
+subcategories:
+  - code: easy
+    hard_negative: false
+    description: Greeting or chat with no money and no links
+  - code: bank_notification
+    hard_negative: true
+    description: Real notice from a bank, such as a purchase or a statement
+  - code: otp_code
+    hard_negative: true
+    description: Legitimate verification code
+  - code: payment_receipt
+    hard_negative: true
+    description: Real Yape, Plin or bank transfer confirmation
+  - code: delivery_notice
+    hard_negative: true
+    description: Order, delivery or courier notice
+  - code: family_money_request
+    hard_negative: true
+    description: A relative who really asks for money
+  - code: promotion
+    hard_negative: true
+    description: Real promotion from a brand
+  - code: job_message
+    hard_negative: true
+    description: Real message about a job or from human resources
+  - code: government_notice
+    hard_negative: true
+    description: Real notice from SUNAT, RENIEC or a municipality
+  - code: service_bill
+    hard_negative: true
+    description: Electricity, water or internet bill

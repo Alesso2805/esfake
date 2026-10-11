@@ -48,6 +48,15 @@ class ModelSettings(_Settings):
     models_offline: bool = Field(default=False, validation_alias="ESFAKE_MODELS_OFFLINE")
 
 
+class CorpusSettings(ModelSettings):
+    """`esfake corpus assign`: the key ring that signs case_ids (CLAUDE.md rule 6).
+
+    A key of its own, never a production key: the owner runs the command locally.
+    """
+
+    corpus_hmac_keys: SecretStr = Field(validation_alias="ESFAKE_CORPUS_HMAC_KEYS")
+
+
 class ApiSettings(ModelSettings):
     internal_secret: SecretStr = Field(validation_alias="ESFAKE_INTERNAL_SECRET")
     # Containers listen on every interface; Docker Compose decides what is published.

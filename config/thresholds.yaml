@@ -1,10 +1,18 @@
 # Decision thresholds (CLAUDE.md rule 12). Every change bumps `version`, which goes into the
-# pipeline manifest. Similarity (k, delta), cluster and out-of-distribution thresholds arrive
-# with EF-07, EF-13 and EF-14.
-version: "0.2"
+# pipeline manifest. Similarity (k, delta) and out-of-distribution thresholds arrive with
+# EF-13 and EF-14.
+version: "0.3"
 
 redaction:
   # ADR-0004 amendments 1 and 2: Wilson 95 % lower bounds on evals/redaction/names_validation.jsonl
   # with es_core_news_lg and redactor v2, rounded down to a whole point.
   name_recall_floor: 0.90 # 115 of 120 names, lower bound 0.906
   name_precision_floor: 0.89 # 138 of 146 name spans, lower bound 0.896
+
+corpus:
+  # EF-07: cosine of the embedding model at or above which two messages are near-duplicates.
+  # Provisional until about 100 pairs near the cut are reviewed by hand (ADR-0003 §6); then
+  # record the value and set `cluster_threshold_reviewed: true`. `esfake corpus assign` refuses
+  # to run before that. Changing it once splits exist creates a major dataset version.
+  cluster_threshold: 0.90
+  cluster_threshold_reviewed: false
