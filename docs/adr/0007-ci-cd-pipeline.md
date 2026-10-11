@@ -37,7 +37,7 @@ Five constraints shape how to do it:
 **Cost.**
 
 - Each push spends about 3 minutes.
-- Each pull request into `main` spends 6 to 10 more. The real figure is measured on the first pull request.
+- Each pull request into `main` spends about 2 more: the first smoke test on arm64 took 1 min 42 s.
 - At the current pace this stays well under 2,000 minutes a month.
 - If usage nears the limit, the first lever is restricting the smoke test to pull requests, then path filters.
 
