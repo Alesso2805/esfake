@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from esfake.shared.clock import FakeClock
-from esfake.shared.config import ApiSettings
+from esfake.shared.config import ApiSettings, CorpusImportSettings
 
 DEV_SECRET = "dev-insecure-internal-secret"  # noqa: S105
 
@@ -32,6 +32,21 @@ def test_trusted_proxies_are_an_explicit_list() -> None:
     )
 
     assert settings.trusted_proxy_list == ["10.0.0.2", "10.0.0.3"]
+
+
+@pytest.mark.parametrize(
+    ("values", "error"),
+    [
+        ({"ESFAKE_ENV": "production"}, "asks /internal/embed"),
+        ({"ESFAKE_INTERNAL_URL": "http://api:8001"}, "needs ESFAKE_INTERNAL_SECRET"),
+    ],
+)
+def test_corpus_import_never_loads_models_in_production(values: dict[str, str], error: str) -> None:
+    # CLAUDE.md rule 9: in production only the API loads models; the CLI asks /internal/embed.
+    base = {"DATABASE_URL": "postgresql+asyncpg://app@db/esfake", "ESFAKE_ACTOR": "owner"}
+
+    with pytest.raises(ValidationError, match=error):
+        CorpusImportSettings.model_validate(base | values)
 
 
 def test_fake_clock_moves_only_when_told() -> None:

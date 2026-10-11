@@ -57,6 +57,28 @@ class CorpusSettings(ModelSettings):
     corpus_hmac_keys: SecretStr = Field(validation_alias="ESFAKE_CORPUS_HMAC_KEYS")
 
 
+class CorpusImportSettings(ModelSettings):
+    """`esfake corpus import` (EF-07): database role, actor, and where embeddings come from.
+
+    In production the CLI never loads models: it asks the API's internal listener (rule 9).
+    """
+
+    database_url: SecretStr = Field(validation_alias="DATABASE_URL")
+    actor: str = Field(min_length=1, validation_alias="ESFAKE_ACTOR")
+    internal_url: str | None = Field(default=None, validation_alias="ESFAKE_INTERNAL_URL")
+    internal_secret: SecretStr | None = Field(
+        default=None, validation_alias="ESFAKE_INTERNAL_SECRET"
+    )
+
+    @model_validator(mode="after")
+    def _production_asks_the_api(self) -> Self:
+        if self.env == "production" and self.internal_url is None:
+            raise ValueError("in production the CLI asks /internal/embed: set ESFAKE_INTERNAL_URL")
+        if self.internal_url is not None and self.internal_secret is None:
+            raise ValueError("ESFAKE_INTERNAL_URL needs ESFAKE_INTERNAL_SECRET")
+        return self
+
+
 class ApiSettings(ModelSettings):
     internal_secret: SecretStr = Field(validation_alias="ESFAKE_INTERNAL_SECRET")
     # Containers listen on every interface; Docker Compose decides what is published.
