@@ -51,6 +51,9 @@ jobs:
       - run: uv run mypy
       - run: uv run pytest
 
+      # CI only validates the committed corpus; it never assigns (CLAUDE.md rule 6).
+      - name: Corpus validation (leaks, coverage)
+        run: uv run esfake corpus validate
       - name: Evaluation gate
         run: uv run esfake eval
       - name: Red-team gate

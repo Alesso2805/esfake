@@ -400,10 +400,6 @@ def corpus_threshold(
     )
 
 
-# CLAUDE.md rule 6: above this share of excluded messages, the cluster threshold is reviewed.
-EXCLUDED_REVIEW_SHARE = 0.05
-
-
 @corpus_app.command("assign")
 def corpus_assign(
     corpus: Annotated[Path, typer.Option(help="Corpus JSONL.")] = DEFAULT_CORPUS,
@@ -427,6 +423,7 @@ def corpus_assign(
         write_corpus,
         write_dataset_info,
     )
+    from esfake.corpus.validate import EXCLUDED_REVIEW_SHARE
     from esfake.shared.clock import SystemClock
     from esfake.shared.config import CorpusSettings
     from esfake.shared.hmac_keys import KeyRing
@@ -492,3 +489,67 @@ def corpus_assign(
             err=True,
         )
     typer.echo("Commit the corpus and dataset.json: CI only validates, it never re-assigns.")
+
+
+@corpus_app.command("validate")
+def corpus_validate(
+    corpus: Annotated[Path, typer.Option(help="Corpus JSONL.")] = DEFAULT_CORPUS,
+) -> None:
+    """Check the committed corpus: assignment, coverage and leaks (CLAUDE.md rule 6). CI runs it."""
+    from collections import Counter
+
+    from pydantic import ValidationError
+
+    from esfake.corpus.clusters import find_leaks
+    from esfake.corpus.dataset import read_corpus, read_dataset_info
+    from esfake.corpus.validate import check_corpus
+    from esfake.shared.thresholds import load_thresholds
+
+    info = read_dataset_info(corpus)
+    if info is None:
+        typer.secho(
+            "WARNING: the corpus has not been assigned yet (no dataset.json, EF-07); nothing "
+            "was validated.",
+            fg=typer.colors.YELLOW,
+            err=True,
+        )
+        return
+    config_dir = ModelSettings().config_dir
+    try:
+        records = read_corpus(corpus)
+    except ValidationError as error:
+        # Field names only: a validation error could otherwise echo message text.
+        fields = sorted({".".join(map(str, e["loc"])) for e in error.errors()})
+        typer.secho(
+            f"ERROR: the corpus breaks its schema in {fields}", fg=typer.colors.RED, err=True
+        )
+        raise typer.Exit(1) from None
+    threshold = load_thresholds(config_dir).corpus.cluster_threshold
+    catalog = load_catalog(config_dir / "modalities.yaml")
+    report = check_corpus(
+        records,
+        info,
+        threshold=threshold,
+        embedding_model=load_models_config(config_dir).embedding.name,
+        textual_modalities={m.code for m in catalog.modalities if m.kind == "textual"},
+    )
+    leaks = find_leaks(records, _local_embedder().embed([r.text for r in records]), threshold)
+    report.problems += [
+        f"leak: {leak.held_out} has the index neighbour {leak.index} at {leak.similarity:.3f}"
+        for leak in leaks[:20]
+    ]
+    if len(leaks) > 20:
+        report.problems.append(f"... and {len(leaks) - 20} more leaks")
+
+    splits = Counter(str(record.split) for record in records)
+    typer.echo(
+        f"Dataset {info.dataset_version}: {len(records)} messages "
+        f"({dict(sorted(splits.items()))}), {len(leaks)} leaks."
+    )
+    for warning in report.warnings:
+        typer.secho(f"WARNING: {warning}", fg=typer.colors.YELLOW, err=True)
+    for problem in report.problems:
+        typer.secho(f"ERROR: {problem}", fg=typer.colors.RED, err=True)
+    if report.problems:
+        raise typer.Exit(1)
+    typer.echo("Corpus valid.")
