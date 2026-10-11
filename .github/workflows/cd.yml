@@ -1,0 +1,65 @@
+name: CD
+
+# Deploys main to the production VM after CI passed on it (ADR-0007). It stays off until EF-18
+# sets up the VM and EF-25 clears the Ley 29733 checklist: then set the repository variable
+# DEPLOY_ENABLED to "true". Repository secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY (a key
+# that can only run deploy/deploy.sh) and DEPLOY_KNOWN_HOSTS. Optional variable: PUBLIC_URL.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time, and never cancel one halfway.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy main to production
+    if: >-
+      vars.DEPLOY_ENABLED == 'true' && (
+        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+        (github.event.workflow_run.conclusion == 'success' &&
+         github.event.workflow_run.event == 'push')
+      )
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Load the deploy key
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      # The VM builds, starts, smoke-tests and rolls back by itself (deploy/deploy.sh).
+      - name: Deploy over SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: >-
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes
+          -o ServerAliveInterval=30 "$DEPLOY_USER@$DEPLOY_HOST" "deploy $SHA"
+
+      - name: Public readiness
+        if: vars.PUBLIC_URL != ''
+        env:
+          PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+        run: >-
+          curl --fail --silent --show-error --retry 5 --retry-delay 10 --retry-all-errors
+          --output /dev/null "$PUBLIC_URL/readyz"
+
+      - name: Remove the deploy key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
