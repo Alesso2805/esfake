@@ -4,13 +4,16 @@ BACKEND := uv run --directory backend
 WEB := npm --prefix web
 
 .DEFAULT_GOAL := help
-.PHONY: help up down migrate lint test eval eval-record redteam
+.PHONY: help up down smoke migrate lint test eval eval-record redteam
 
 help: ## List the available targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-12s %s\n", $$1, $$2}'
 
 up: ## Build and start every service, waiting until healthy
 	docker compose up --detach --build --wait
+
+smoke: ## Smoke checks against the stack started by `make up` (as CI and deploys do)
+	sh deploy/smoke.sh
 
 down: ## Stop every service (data volume kept; `docker compose down -v` drops it)
 	docker compose down

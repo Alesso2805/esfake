@@ -1,9 +1,14 @@
 name: CI
 
+# Every push to any branch runs the fast checks. Pull requests into main, and main itself, also
+# start the whole stack with Docker Compose on arm64, the production architecture (ADR-0007).
+# A pull request shows the checks of its head commit, so the fast checks do not run twice.
 on:
-  pull_request:
   push:
+    branches: ["**"]
+  pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,7 +20,9 @@ concurrency:
 jobs:
   backend:
     name: Backend (Ruff, Mypy, Pytest)
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: backend
@@ -44,14 +51,16 @@ jobs:
       - run: uv run mypy
       - run: uv run pytest
 
-      - name: Evaluation gate (stub until EF-08)
+      - name: Evaluation gate
         run: uv run esfake eval
-      - name: Red-team gate (stub until EF-17)
+      - name: Red-team gate
         run: uv run esfake redteam
 
   web:
     name: Web (ESLint, Next.js build)
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: web
@@ -67,3 +76,23 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run build
+
+  compose:
+    name: Compose smoke test (arm64)
+    # On a pull request this tests the merge result; on main it gates the deploy (cd.yml).
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build and start every service
+        run: docker compose up --detach --build --wait --wait-timeout 900
+      - name: Smoke checks
+        run: sh deploy/smoke.sh
+      - name: Service logs
+        if: failure()
+        run: docker compose logs --no-color --tail 200
+      - name: Stop
+        if: always()
+        run: docker compose down --volumes
