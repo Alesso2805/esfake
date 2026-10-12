@@ -638,3 +638,85 @@ def corpus_import(
         asyncio.run(run())
     except (FrozenCorpusError, ValueError, urllib.error.URLError) as error:
         raise fail(str(error)) from None
+
+
+DEFAULT_COMPARISON = Path("../docs/evals/embedding-comparison.json")
+
+
+@corpus_app.command("compare-models")
+def corpus_compare_models(
+    pairs: Annotated[Path, typer.Option(exists=True, help="Labelled pairs.")] = DEFAULT_PAIRS,
+    corpus: Annotated[Path, typer.Option(help="Corpus JSONL.")] = DEFAULT_CORPUS,
+    out: Annotated[Path, typer.Option(help="Where the evidence is written.")] = (
+        DEFAULT_COMPARISON
+    ),
+) -> None:
+    """Compare the deployed embedding model with the contender (ADR-0003, amendment 1)."""
+    import time
+
+    from esfake.corpus.clusters import cosine_matrix
+    from esfake.corpus.dataset import read_corpus
+    from esfake.corpus.pairs import read_labeled_pairs, record_ref
+    from esfake.evaluation.embedding_comparison import ModelMeasures, compare
+    from esfake.shared.clock import SystemClock
+
+    try:
+        labeled = read_labeled_pairs(pairs)
+    except ValueError as error:
+        typer.secho(f"ERROR: {error}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1) from None
+    records = read_corpus(corpus)
+    by_ref = {record_ref(record): record for record in records}
+    refs = sorted({ref for pair in labeled for ref in (pair.ref_a, pair.ref_b)})
+    unknown = [ref for ref in refs if ref not in by_ref]
+    if unknown:
+        typer.secho(f"ERROR: pairs refer to texts not in the corpus: {unknown}", err=True)
+        raise typer.Exit(1)
+    texts = [by_ref[ref].text for ref in refs]
+    position = {ref: i for i, ref in enumerate(refs)}
+
+    def measure(contender: bool) -> ModelMeasures:
+        embedder = _local_embedder(contender=contender)
+        similarities = cosine_matrix(embedder.embed(texts))
+        embedder.embed(texts[:1])  # warm-up, not timed
+        latencies = []
+        for text in texts:  # one message at a time, as a verification embeds it
+            start = time.perf_counter()
+            embedder.embed([text])
+            latencies.append((time.perf_counter() - start) * 1000)
+        return ModelMeasures(
+            name=embedder.model_name,
+            scores=[float(similarities[position[p.ref_a], position[p.ref_b]]) for p in labeled],
+            latencies_ms=latencies,
+            token_counts=embedder.token_counts([record.text for record in records]),
+            max_tokens=embedder.max_tokens,
+        )
+
+    result = compare(
+        measure(contender=False),
+        measure(contender=True),
+        [pair.same for pair in labeled],
+        SystemClock().now().date(),
+    )
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(result.model_dump_json(indent=2) + "\n")
+
+    typer.echo(f"Embedding checkpoint on {result.pairs} labelled pairs ({result.same} 'same'):")
+    typer.echo(
+        f"  {'model':<60} {'AUC':>6} {'cut':>6} {'F1':>5} {'p95 ms':>7} {'>128':>6} {'>512':>6}"
+    )
+    for model in (result.deployed, result.contender):
+        typer.echo(
+            f"  {model.name:<60} {model.auc:>6.3f} {model.threshold:>6.3f} {model.f1:>5.2f} "
+            f"{model.latency_ms_p95:>7.1f} {model.share_over[128]:>6.1%} "
+            f"{model.share_over[512]:>6.1%}"
+        )
+    gain = result.auc_difference
+    typer.echo(
+        f"AUC gain of the contender: {gain.difference:+.3f}, 95 % interval [{gain.low:+.3f}, "
+        f"{gain.high:+.3f}] ({gain.resamples} paired resamples)."
+    )
+    winner = result.contender.name if result.switch else result.deployed.name
+    typer.echo(f"Decision: {winner} ({'; '.join(result.reasons)}).")
+    typer.echo(f"Wrote {out}; record the result in ADR-0003, amendment 2.")

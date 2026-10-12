@@ -11,6 +11,7 @@ import numpy as np
 import onnxruntime
 from fastembed import TextEmbedding
 from fastembed.common.model_description import ModelSource, PoolingType
+from tokenizers import Tokenizer
 
 from esfake.shared.models_config import EmbeddingModelConfig
 
@@ -54,6 +55,26 @@ class FastEmbedEmbedder:
         norms = np.linalg.norm(vectors, axis=1, keepdims=True)
         normalised: list[list[float]] = (vectors / norms).tolist()
         return normalised
+
+    def _tokenizer(self) -> Tokenizer:
+        # fastembed keeps the Hugging Face tokenizer on its backend model.
+        tokenizer: Tokenizer = self._model.model.tokenizer  # type: ignore[attr-defined]
+        return tokenizer
+
+    @property
+    def max_tokens(self) -> int:
+        """Where the model truncates its input."""
+        truncation = self._tokenizer().truncation
+        return int(truncation["max_length"]) if truncation else 0
+
+    def token_counts(self, texts: Sequence[str]) -> list[int]:
+        """Tokens per text before truncation, prefix included (ADR-0003, amendment 1)."""
+        tokenizer = Tokenizer.from_str(
+            self._tokenizer().to_str()
+        )  # a copy: the model's keeps truncating
+        tokenizer.no_truncation()
+        tokenizer.no_padding()
+        return [len(e.ids) for e in tokenizer.encode_batch([self._prefix + t for t in texts])]
 
 
 def _register(config: EmbeddingModelConfig) -> None:
