@@ -78,6 +78,32 @@ def select_review_pairs(
     ]
 
 
+def matched_range(
+    reference: NDArray[np.float64], other: NDArray[np.float64], low: float, high: float
+) -> tuple[float, float]:
+    """The range of `other` that holds, by rank, the pairs that [low, high) holds in `reference`.
+
+    Each model has its own similarity scale (e5 rates unrelated messages around 0.8), so the
+    contender's bins cover the same upper tail of all pairs, not the same numbers.
+    """
+    rows, cols = np.triu_indices(len(reference), k=1)
+    ranked, descending = reference[rows, cols], np.sort(other[rows, cols])[::-1]
+
+    def at_rank(cut: float) -> float:
+        # If k pairs reach `cut` in the reference, the contender's cut is its k-th highest value,
+        # so the same number of pairs reach it; with none, a cut just above its highest value.
+        k = int(np.count_nonzero(ranked >= cut))
+        return float(descending[k - 1]) if k else float(np.nextafter(descending[0], np.inf))
+
+    return at_rank(low), at_rank(high)
+
+
+def merge_pairs(*groups: list[ReviewPair]) -> list[ReviewPair]:
+    """One list without repeats, in the same shuffled but deterministic order as each group."""
+    unique = {(p.ref_a, p.ref_b): p for group in groups for p in group}
+    return sorted(unique.values(), key=lambda p: _pair_key(p.ref_a, p.ref_b))
+
+
 def write_pairs(path: Path, pairs: list[ReviewPair]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     # utf-8-sig so spreadsheet programs show accents correctly.

@@ -205,12 +205,7 @@ def serve() -> None:
         return build_redactor(settings.config_dir)
 
     def load_embedder() -> FastEmbedEmbedder:
-        return FastEmbedEmbedder(
-            embedding.name,
-            embedding.dimensions,
-            settings.models_dir,
-            offline=settings.models_offline,
-        )
+        return FastEmbedEmbedder(embedding, settings.models_dir, offline=settings.models_offline)
 
     asyncio.run(serve_api(settings, load_embedder, load_redactor))
 
@@ -222,7 +217,7 @@ def download_models() -> None:
 
     settings = ModelSettings()
     embedding = load_models_config(settings.config_dir).embedding
-    download_model(embedding.name, settings.models_dir)
+    download_model(embedding, settings.models_dir)
     typer.echo(f"Downloaded {embedding.name} into {settings.models_dir}.")
 
 
@@ -334,15 +329,19 @@ def corpus_add(
 DEFAULT_PAIRS = Path("../evals/datasets/cluster_pairs.csv")
 
 
-def _local_embedder() -> FastEmbedEmbedder:
-    """In development and CI the CLI loads the model itself; production uses /internal/embed."""
+def _local_embedder(contender: bool = False) -> FastEmbedEmbedder:
+    """In development and CI the CLI loads the model itself; production uses /internal/embed.
+
+    `contender` loads the model the EF-07 checkpoint compares against (ADR-0003, amendment 1).
+    """
     from esfake.pipeline.similarity.embedder import FastEmbedEmbedder
 
     settings = ModelSettings()
-    embedding = load_models_config(settings.config_dir).embedding
-    return FastEmbedEmbedder(
-        embedding.name, embedding.dimensions, settings.models_dir, offline=settings.models_offline
-    )
+    models = load_models_config(settings.config_dir)
+    config = models.embedding_contender if contender else models.embedding
+    if config is None:
+        raise typer.BadParameter("config/models.yaml names no embedding_contender")
+    return FastEmbedEmbedder(config, settings.models_dir, offline=settings.models_offline)
 
 
 @corpus_app.command("pairs")
@@ -352,18 +351,38 @@ def corpus_pairs(
     per_bin: Annotated[int, typer.Option(help="Pairs per similarity bin (10 bins).")] = 10,
     low: Annotated[float, typer.Option(help="Lowest similarity sampled.")] = 0.70,
     high: Annotated[float, typer.Option(help="Highest similarity sampled.")] = 0.98,
+    contender: Annotated[
+        bool, typer.Option(help="Take half the pairs near the contender model's cut too.")
+    ] = True,
 ) -> None:
-    """Sample pairs around the likely cluster threshold for manual review (ADR-0003 §6)."""
+    """Sample pairs around the likely cluster threshold for manual review (ADR-0003 §6).
+
+    With the contender of config/models.yaml, half the pairs sit near each model's cut, so the
+    same labels serve the embedding checkpoint and the threshold of whichever model wins
+    (ADR-0003, amendment 1).
+    """
     from esfake.corpus.clusters import cosine_matrix
     from esfake.corpus.dataset import read_corpus
-    from esfake.corpus.pairs import select_review_pairs, write_pairs
+    from esfake.corpus.pairs import matched_range, merge_pairs, select_review_pairs, write_pairs
 
     records = read_corpus(corpus)
     if len(records) < 2:
         typer.secho("ERROR: the corpus needs at least two messages", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
-    similarities = cosine_matrix(_local_embedder().embed([record.text for record in records]))
-    pairs = select_review_pairs(records, similarities, low=low, high=high, per_bin=per_bin)
+    texts = [record.text for record in records]
+    similarities = cosine_matrix(_local_embedder().embed(texts))
+    has_contender = load_models_config(ModelSettings().config_dir).embedding_contender is not None
+    if contender and has_contender:
+        other = cosine_matrix(_local_embedder(contender=True).embed(texts))
+        other_low, other_high = matched_range(similarities, other, low, high)
+        half = max(1, per_bin // 2)
+        pairs = merge_pairs(
+            select_review_pairs(records, similarities, low=low, high=high, per_bin=half),
+            select_review_pairs(records, other, low=other_low, high=other_high, per_bin=half),
+        )
+        typer.echo(f"Contender range matched by rank: {other_low:.3f} to {other_high:.3f}.")
+    else:
+        pairs = select_review_pairs(records, similarities, low=low, high=high, per_bin=per_bin)
     write_pairs(out, pairs)
     typer.echo(
         f"Wrote {len(pairs)} pairs to {out}. In the 'same' column write 'si' when both texts are "

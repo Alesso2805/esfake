@@ -14,9 +14,7 @@ from tests.paths import REPO_DIR
 def embedder() -> FastEmbedEmbedder:
     settings = ModelSettings()
     embedding = load_models_config(REPO_DIR / "config").embedding
-    return FastEmbedEmbedder(
-        embedding.name, embedding.dimensions, settings.models_dir, offline=False
-    )
+    return FastEmbedEmbedder(embedding, settings.models_dir, offline=False)
 
 
 def test_vectors_are_normalised_and_384_dimensional(embedder: FastEmbedEmbedder) -> None:

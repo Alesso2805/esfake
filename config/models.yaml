@@ -1,9 +1,21 @@
-# Models loaded by the API (ADR-0003, ADR-0004). Any change here changes the pipeline manifest
-# and the CI model cache key.
+# Models loaded by the API (ADR-0003, ADR-0004). Any change here changes the CI model cache key,
+# and a change to `embedding` or `spacy` changes the pipeline manifest.
 embedding:
   name: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
   runtime: fastembed
   dimensions: 384
+# EF-07 checkpoint (ADR-0003 §1, amendment 1): compared with `embedding` on the labelled pairs by
+# `esfake corpus compare-models`. Never loaded by the API. fastembed does not ship it, so it is
+# registered from the ONNX export in its own Hugging Face repository.
+embedding_contender:
+  name: intfloat/multilingual-e5-small
+  runtime: fastembed
+  dimensions: 384
+  prefix: "query: "
+  onnx:
+    repository: intfloat/multilingual-e5-small
+    model_file: onnx/model.onnx
+    pooling: mean
 spacy:
   # Chosen in EF-06 by recall on the validation set, within the 150 ms budget (ADR-0004).
   name: es_core_news_lg
