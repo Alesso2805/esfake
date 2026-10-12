@@ -5,16 +5,22 @@ Both models score the same labelled pairs. The contender replaces the deployed m
 latency per message fits the 200 ms budget of the similarity layer.
 """
 
+import multiprocessing
 import random
+import time
 from collections.abc import Sequence
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from datetime import date
+from pathlib import Path
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict
 
 from esfake.corpus.pairs import choose_threshold
 from esfake.evaluation.stats import BOOTSTRAP_RESAMPLES, BOOTSTRAP_SEED, percentile
+from esfake.pipeline.similarity.embedder import FastEmbedEmbedder
+from esfake.shared.models_config import EmbeddingModelConfig
 
 LATENCY_BUDGET_MS = 200.0  # docs/SPEC.md, similarity layer
 LONG_MESSAGE_TOKENS = (128, 512)  # MiniLM's training length and e5's window
@@ -32,6 +38,35 @@ def roc_auc(scores: Sequence[float], labels: Sequence[bool]) -> float:
     ranks = np.empty(len(values))
     ranks[order] = average_rank[inverse]
     return float((ranks[same].sum() - positives * (positives + 1) / 2) / (positives * negatives))
+
+
+def _latencies(config_json: str, cache_dir: str, offline: bool, texts: list[str]) -> list[float]:
+    config = EmbeddingModelConfig.model_validate_json(config_json)
+    embedder = FastEmbedEmbedder(config, Path(cache_dir), offline=offline)
+    embedder.embed(texts[:1])  # warm-up, not timed
+    latencies = []
+    for text in texts:  # one message at a time, as a verification embeds it
+        start = time.perf_counter()
+        embedder.embed([text])
+        latencies.append((time.perf_counter() - start) * 1000)
+    return latencies
+
+
+def measure_latencies(
+    config: EmbeddingModelConfig, cache_dir: Path, texts: Sequence[str], *, offline: bool
+) -> list[float]:
+    """Per-message latency, measured in a fresh process with no other model loaded.
+
+    Two ONNX Runtime sessions in one process slowed each other down about 17 times on
+    2026-10-11, whichever model came second, and freeing the first did not help. Measured
+    together, the second model would lose on latency for a reason that is not its own.
+    """
+    context = multiprocessing.get_context("spawn")
+    with ProcessPoolExecutor(max_workers=1, mp_context=context) as pool:
+        job = pool.submit(
+            _latencies, config.model_dump_json(), str(cache_dir), offline, list(texts)
+        )
+        return job.result()
 
 
 class AucDifference(BaseModel):

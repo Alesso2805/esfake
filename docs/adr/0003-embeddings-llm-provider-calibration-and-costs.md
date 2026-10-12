@@ -239,7 +239,7 @@ Both models are scored on the same labelled pairs:
 
 - **AUC** of cosine similarity for "same" against "different". It needs no threshold.
 - **Best cut** by F1, with the §6 rule, and its agreement with the labels.
-- **p95 latency** to embed one message, on the development machine.
+- **p95 latency** to embed one message, on the development machine. Each model is timed in a fresh process with no other model loaded (see below).
 - **Long messages:** the share of corpus messages over 128 tokens (MiniLM's training length) and over 512 tokens (e5's window), each counted with its own tokenizer.
 
 ### Decision rule
@@ -252,3 +252,11 @@ e5-small replaces MiniLM only if both hold:
 Otherwise MiniLM stays. Switching costs a new image, a new threshold and re-clustering, and an AUC difference that the interval cannot tell from zero does not pay for that.
 
 The results go to `docs/evals/embedding-comparison.json` and to a second amendment, whichever way they fall. Latency on the production VM (ARM) is checked again in EF-18.
+
+### Latency is measured one model per process (clarified 2026-10-11, before any measurement)
+
+A first dry run timed both models in the same process and made e5 look about 17 times slower than MiniLM: p50 around 120 ms against 6.5 ms. Each model alone takes about 6.5 ms (p50) and 8 ms (p95) on the development machine.
+
+The cause is two ONNX Runtime sessions in one process slowing each other down. It hits whichever model runs second, and freeing the first session does not help. `esfake corpus compare-models` therefore times each model in a fresh process.
+
+The same constraint holds in production: one ONNX Runtime session per process. The API loads only the embedding model, so it holds today. Any later ONNX model goes in its own process or must be measured together with this one.
