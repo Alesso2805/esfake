@@ -13,12 +13,12 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from esfake.corpus.dataset import CorpusRecord, Label, Source, read_corpus, write_corpus
-from esfake.corpus.modalities import ModalityCatalog
 from esfake.corpus.subcategories import SubcategoryCatalog
 from esfake.pipeline.normalize import normalize
 from esfake.pipeline.redaction import Redactor
 from esfake.pipeline.text import RawText
 from esfake.shared.clock import Clock
+from esfake.shared.modalities import ModalityCatalog
 
 COLUMNS = ("text", "label", "modality", "subcategory", "source", "reference", "language")
 

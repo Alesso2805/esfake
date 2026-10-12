@@ -26,8 +26,6 @@ LEVEL = {package: level for level, packages in enumerate(LAYERS) for package in 
 
 # (importing module, imported package): why it exists and what removes it.
 KNOWN_VIOLATIONS: dict[tuple[str, str], str] = {
-    ("esfake.shared.brands", "corpus"): "modality catalogue lives in corpus; moves to shared",
-    ("esfake.pipeline.rules.catalog", "corpus"): "same catalogue; moves to shared",
     (
         "esfake.pipeline.similarity.internal_client",
         "api",

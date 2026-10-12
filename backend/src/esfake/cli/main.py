@@ -17,9 +17,10 @@ if TYPE_CHECKING:
     from esfake.pipeline.llm.cache import CacheMode
     from esfake.pipeline.similarity.embedder import FastEmbedEmbedder
 
-from esfake.corpus.modalities import ModalityCatalog, load_catalog, sync_modalities
+from esfake.corpus.modalities import sync_modalities
 from esfake.shared.config import ApiSettings, MigrationSettings, ModelSettings
 from esfake.shared.db import create_engine
+from esfake.shared.modalities import ModalityCatalog, load_catalog
 from esfake.shared.models_config import load_models_config
 
 app = typer.Typer(no_args_is_help=True, help="¿EsFake? command-line tools.")

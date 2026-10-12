@@ -28,8 +28,6 @@ Las violaciones que existían al crear la regla están listadas en `KNOWN_VIOLAT
 
 | Importador | Importa | Corrección |
 | --- | --- | --- |
-| `shared.brands` | `corpus` | Mover el catálogo de modalidades a `shared` |
-| `pipeline.rules.catalog` | `corpus` | Igual: usar el catálogo de `shared` |
 | `pipeline.similarity.internal_client` | `api` | Mover el contrato de `/internal/embed` a un módulo neutral |
 
 No se agregan excepciones nuevas. Si un cambio las necesita, se rediseña la dependencia o se discute el orden de capas y se actualiza este documento.

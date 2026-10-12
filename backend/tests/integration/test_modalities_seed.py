@@ -4,8 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from typer.testing import CliRunner
 
 from esfake.cli.main import app
-from esfake.corpus.modalities import ModalityCatalog, load_catalog, sync_modalities
+from esfake.corpus.modalities import sync_modalities
 from esfake.shared.db.models import Modality
+from esfake.shared.modalities import ModalityCatalog, load_catalog
 from tests.integration.conftest import Database
 from tests.paths import MODALITIES_YAML
 
