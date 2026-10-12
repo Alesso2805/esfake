@@ -3,20 +3,22 @@
 # ESFAKE_ENV=production the services refuse to start until each one is replaced (see .env.example).
 name: esfake
 
+# Runtime environment shared by every service. It holds no owner credentials (ADR-0002 §6): an
+# attacker who gets code execution in the API or a worker must not be able to change the schema.
+x-backend-env: &backend-env
+  ESFAKE_ENV: ${ESFAKE_ENV:-development}
+  # Runtime role. No pooler here, so the direct URL is the same server (ADR-0002 §3).
+  DATABASE_URL: postgresql+asyncpg://esfake_app:${ESFAKE_APP_PASSWORD:-dev-insecure-app}@db:5432/esfake
+  DATABASE_DIRECT_URL: postgresql+asyncpg://esfake_app:${ESFAKE_APP_PASSWORD:-dev-insecure-app}@db:5432/esfake
+  ESFAKE_INTERNAL_SECRET: ${ESFAKE_INTERNAL_SECRET:-dev-insecure-internal-secret}
+  ESFAKE_TRUSTED_PROXIES: ${ESFAKE_TRUSTED_PROXIES:-}
+
 x-backend: &backend
   build:
     context: .
     dockerfile: backend/Dockerfile
   image: esfake-backend:local
-  environment:
-    ESFAKE_ENV: ${ESFAKE_ENV:-development}
-    # Runtime role. No pooler here, so the direct URL is the same server (ADR-0002 §3).
-    DATABASE_URL: postgresql+asyncpg://esfake_app:${ESFAKE_APP_PASSWORD:-dev-insecure-app}@db:5432/esfake
-    DATABASE_DIRECT_URL: postgresql+asyncpg://esfake_app:${ESFAKE_APP_PASSWORD:-dev-insecure-app}@db:5432/esfake
-    # Owner role, used only by the migrate service.
-    MIGRATIONS_DATABASE_URL: postgresql+asyncpg://esfake_owner:${ESFAKE_OWNER_PASSWORD:-dev-insecure-owner}@db:5432/esfake
-    ESFAKE_INTERNAL_SECRET: ${ESFAKE_INTERNAL_SECRET:-dev-insecure-internal-secret}
-    ESFAKE_TRUSTED_PROXIES: ${ESFAKE_TRUSTED_PROXIES:-}
+  environment: *backend-env
 
 services:
   db:
@@ -40,6 +42,10 @@ services:
 
   migrate:
     <<: *backend
+    environment:
+      <<: *backend-env
+      # Owner role: only this service may change the schema.
+      MIGRATIONS_DATABASE_URL: postgresql+asyncpg://esfake_owner:${ESFAKE_OWNER_PASSWORD:-dev-insecure-owner}@db:5432/esfake
     command: ["sh", "-c", "alembic upgrade head && esfake seed-modalities /app/config/modalities.yaml"]
     restart: "no"
     depends_on:

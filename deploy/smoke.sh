@@ -27,3 +27,15 @@ if curl --silent --max-time 3 --output /dev/null "$internal/"; then
     exit 1
 fi
 echo "ok: internal listener not published"
+
+# The runtime services must not hold the owner role (ADR-0002 §6). Only checked where the stack
+# runs under Compose from this directory (CI and the VM), not when pointed at a remote URL.
+if command -v docker >/dev/null 2>&1 && [ -n "$(docker compose ps --quiet api 2>/dev/null)" ]; then
+    for service in api worker-channels worker-maintenance; do
+        if docker compose exec -T "$service" printenv MIGRATIONS_DATABASE_URL >/dev/null 2>&1; then
+            echo "FAILED: $service holds the owner database URL" >&2
+            exit 1
+        fi
+    done
+    echo "ok: runtime services hold no owner credentials"
+fi
