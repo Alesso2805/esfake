@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-import esfake.cli.main
+import esfake.cli.evaluation
 import esfake.pipeline.redaction
 from esfake.cli.main import app
 from esfake.corpus.dataset import CorpusRecord, write_corpus
@@ -66,7 +66,7 @@ def corpus_with(tmp_path: Path, scams: int, legit: int = 1) -> Path:
 @pytest.fixture(autouse=True)
 def no_spacy_and_a_clean_commit(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(esfake.pipeline.redaction, "build_redactor", lambda _: Redactor())
-    monkeypatch.setattr(esfake.cli.main, "_git_sha", lambda: "abc123")
+    monkeypatch.setattr(esfake.cli.evaluation, "_git_sha", lambda: "abc123")
 
 
 @pytest.mark.parametrize(
@@ -152,7 +152,7 @@ def test_eval_fails_on_a_significant_recall_regression(tmp_path: Path) -> None:
 
 
 def test_publishing_needs_a_committed_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(esfake.cli.main, "_git_sha", lambda: "abc123-dirty")
+    monkeypatch.setattr(esfake.cli.evaluation, "_git_sha", lambda: "abc123-dirty")
     corpus, evals = corpus_with(tmp_path, scams=1), tmp_path / "evals"
 
     result = runner.invoke(
