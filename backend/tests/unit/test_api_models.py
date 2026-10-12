@@ -8,11 +8,15 @@ from pydantic import BaseModel
 
 import esfake.api
 
+# The internal listener's request and response models live in the shared contract, not in `api`.
+CONTRACT_MODULES = ("esfake.shared.internal_contract",)
+
 
 def _api_models() -> list[type[BaseModel]]:
     models = []
-    for info in pkgutil.walk_packages(esfake.api.__path__, prefix="esfake.api."):
-        module = importlib.import_module(info.name)
+    names = [info.name for info in pkgutil.walk_packages(esfake.api.__path__, prefix="esfake.api.")]
+    for name in (*names, *CONTRACT_MODULES):
+        module = importlib.import_module(name)
         for _, member in inspect.getmembers(module, inspect.isclass):
             if issubclass(member, BaseModel) and member.__module__ == module.__name__:
                 models.append(member)
@@ -24,3 +28,9 @@ def test_every_api_model_hides_its_input_in_errors() -> None:
 
     assert models, "the scan found no API models"
     assert [m.__name__ for m in models if not m.model_config.get("hide_input_in_errors")] == []
+
+
+def test_the_scan_includes_the_shared_internal_contract() -> None:
+    names = {model.__name__ for model in _api_models()}
+
+    assert {"EmbedRequest", "EmbedResponse"} <= names

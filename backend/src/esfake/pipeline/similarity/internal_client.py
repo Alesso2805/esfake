@@ -11,7 +11,7 @@ from collections.abc import Callable, Sequence
 
 from pydantic import SecretStr
 
-from esfake.api.internal import MAX_TEXTS, SECRET_HEADER, EmbedResponse
+from esfake.shared.internal_contract import MAX_TEXTS, SECRET_HEADER, EmbedResponse
 
 type Post = Callable[[str, bytes, dict[str, str]], bytes]
 
