@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-import esfake.cli.main
+import esfake.cli._common
 from esfake.cli.main import app
 from esfake.corpus.dataset import CorpusRecord, read_corpus, read_dataset_info, write_corpus
 from tests.paths import CONFIG_DIR
@@ -54,7 +54,7 @@ def config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     set_cut(config, "0.90", reviewed=True)
     monkeypatch.setenv("ESFAKE_CONFIG_DIR", str(config))
     monkeypatch.setenv("ESFAKE_CORPUS_HMAC_KEYS", f"c1:{KEY_VALUE}")
-    monkeypatch.setattr(esfake.cli.main, "_local_embedder", TopicEmbedder)
+    monkeypatch.setattr(esfake.cli._common, "local_embedder", TopicEmbedder)
     return config
 
 

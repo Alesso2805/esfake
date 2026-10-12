@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-import esfake.cli.main
+import esfake.cli._common
 import esfake.evaluation.embedding_comparison
 from esfake.cli.main import app
 from esfake.corpus.dataset import CorpusRecord, write_corpus
@@ -131,7 +131,7 @@ def test_the_command_writes_the_evidence_and_the_decision(
         for line, answer in zip(labelled[1:], answers, strict=True)
     ]
     pairs_csv.write_text("\n".join(rows) + "\n", encoding="utf-8-sig")
-    monkeypatch.setattr(esfake.cli.main, "_local_embedder", TopicEmbedder)
+    monkeypatch.setattr(esfake.cli._common, "local_embedder", TopicEmbedder)
     # Latency runs each real model in a fresh process; here it is a fixed figure.
     monkeypatch.setattr(
         esfake.evaluation.embedding_comparison,

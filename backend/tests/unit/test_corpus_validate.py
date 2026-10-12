@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-import esfake.cli.main
+import esfake.cli._common
 from esfake.cli.main import app
 from esfake.corpus.dataset import CorpusRecord, DatasetInfo, Split, write_corpus, write_dataset_info
 from esfake.corpus.validate import check_corpus
@@ -115,7 +115,7 @@ def config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     config = tmp_path / "config"
     shutil.copytree(CONFIG_DIR, config)
     monkeypatch.setenv("ESFAKE_CONFIG_DIR", str(config))
-    monkeypatch.setattr(esfake.cli.main, "_local_embedder", TopicEmbedder)
+    monkeypatch.setattr(esfake.cli._common, "local_embedder", TopicEmbedder)
     return config
 
 

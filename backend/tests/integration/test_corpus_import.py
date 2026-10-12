@@ -14,7 +14,7 @@ from sqlalchemy import delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 from typer.testing import CliRunner
 
-import esfake.cli.main
+import esfake.cli._common
 from esfake.cli.main import app
 from esfake.corpus.dataset import CorpusRecord, DatasetInfo, write_corpus, write_dataset_info
 from esfake.corpus.importer import FrozenCorpusError, ImportReport, import_corpus
@@ -220,7 +220,7 @@ def test_the_cli_imports_with_the_runtime_role(
     monkeypatch.setenv("DATABASE_URL", database.app_url)
     monkeypatch.setenv("ESFAKE_ACTOR", ACTOR)
     monkeypatch.delenv("ESFAKE_INTERNAL_URL", raising=False)
-    monkeypatch.setattr(esfake.cli.main, "_local_embedder", FakeEmbedder)
+    monkeypatch.setattr(esfake.cli._common, "local_embedder", FakeEmbedder)
     runner = CliRunner()
 
     try:
