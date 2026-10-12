@@ -1,7 +1,7 @@
 """The pipeline behind one interface, so the API, the worker and the evaluation run the same code.
 
 Detection layers arrive one story at a time (rules and injection in EF-11, URLs in EF-12,
-similarity in EF-13, the judge in EF-14); version 0 has none, so policy v0 sees no signals.
+similarity in EF-13, the judge in EF-14).
 """
 
 from collections.abc import Sequence
@@ -10,6 +10,7 @@ from typing import Protocol
 
 from esfake.pipeline.decision.policy_v0 import decide
 from esfake.pipeline.llm.cache import ResponseCache
+from esfake.pipeline.rules.detector import RuleDetector
 from esfake.pipeline.text import RedactedText
 from esfake.pipeline.verdict import Signal, Verdict
 from esfake.shared.thresholds import PolicyV0Thresholds, load_thresholds
@@ -34,6 +35,6 @@ class Pipeline:
 
 
 def build_pipeline(config_dir: Path, judge_cache: ResponseCache) -> Pipeline:
-    """The pipeline of this commit. The judge (EF-14) will answer through `judge_cache`; version
-    0 has no detectors and no judge, so nothing reads it yet."""
-    return Pipeline([], load_thresholds(config_dir).policy_v0)
+    """The pipeline of this commit: rules and injection (EF-11). The judge (EF-14) will answer
+    through `judge_cache`; nothing reads it yet."""
+    return Pipeline([RuleDetector.from_config(config_dir)], load_thresholds(config_dir).policy_v0)

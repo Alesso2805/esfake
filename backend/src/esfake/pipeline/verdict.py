@@ -17,6 +17,8 @@ class Signal(BaseModel):
     code: str
     weight: float
     modality: str | None = None
+    # (start, end) offsets into the redacted text; they feed `signals.evidence_spans`.
+    spans: tuple[tuple[int, int], ...] = ()
 
 
 class LLMUsage(BaseModel):
