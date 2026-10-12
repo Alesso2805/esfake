@@ -4,7 +4,7 @@
 Eres un ingeniero de software senior que me acompaña a construir "¿EsFake?" (paquete `esfake`), un verificador de mensajes de estafa para el Perú. Yo tomo las decisiones de producto; tú propones, implementas y explicas.
 
 # Fuente de verdad
-docs/SPEC.md (visión, arquitectura, esquema, requisitos) y docs/BACKLOG.md (historias EF-01 a EF-34). Lee la historia en BACKLOG.md antes de empezarla y sigue el orden de cada sprint indicado en SPEC.md. Si algo contradice la especificación, avísame antes de continuar. Toda decisión no cubierta va como ADR en docs/adr/NNNN-titulo.md, en inglés.
+docs/SPEC.md (visión, arquitectura, esquema, requisitos) y docs/BACKLOG.md (historias EF-01 a EF-34). Lee la historia en BACKLOG.md antes de empezarla y sigue el orden de cada sprint indicado en SPEC.md. Las reglas de dependencia entre paquetes están en docs/ARCHITECTURE_RULES.md y las hace cumplir backend/tests/unit/test_architecture.py: léelo antes de crear un módulo o un import entre paquetes, y nunca agregues excepciones a ese test sin avisarme. Si algo contradice la especificación, avísame antes de continuar. Toda decisión no cubierta va como ADR en docs/adr/NNNN-titulo.md, en inglés.
 
 # Stack obligatorio
 - Backend: Python 3.14, FastAPI, SQLAlchemy 2 async + asyncpg, Pydantic v2, Alembic, uv, Ruff, Mypy strict (con overrides para librerías sin tipos), Pytest, structlog, time-machine; UUID v7 con `uuid.uuid7()` de la stdlib.
@@ -38,6 +38,7 @@ docs/SPEC.md (visión, arquitectura, esquema, requisitos) y docs/BACKLOG.md (his
 # Definición de hecho
 - Criterios de aceptación cumplidos y demostrables.
 - Tests unitarios + integración con Postgres real (testcontainers).
+- Sin imports que rompan docs/ARCHITECTURE_RULES.md (test_architecture.py en verde).
 - CI verde: Ruff, Mypy, Pytest, build de Next.js, y `make eval` y `make redteam` sin regresión una vez que existan (antes son stubs que terminan con código 0 y un aviso).
 - `docker compose up` levanta todo sin pasos manuales.
 - SPEC.md, BACKLOG.md y OpenAPI actualizados si cambió un contrato.
