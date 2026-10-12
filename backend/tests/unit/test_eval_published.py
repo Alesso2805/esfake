@@ -41,7 +41,7 @@ def corpus_with(tmp_path: Path, scams: int, legit: int = 1) -> Path:
             source="synthetic",
             label="scam",
             modality="fake_prize",
-            text=f"Ganaste el premio {i}",
+            text=f"Obsequio especial número {i}",
             added_at=TODAY,
             split="eval",
         )
@@ -127,7 +127,7 @@ def test_eval_publishes_version_zero_then_compares_against_it(tmp_path: Path) ->
     published = json.loads((evals / "v0.json").read_text(encoding="utf-8"))
     assert published["manifest"]["git_sha"] == "abc123"
     assert {case["level"] for case in published["predictions"]} == {"no_signals"}
-    assert "Ganaste" not in (evals / "v0.json").read_text(encoding="utf-8")
+    assert "Obsequio" not in (evals / "v0.json").read_text(encoding="utf-8")
     assert second.exit_code == 0
     assert "Compared with v0 on 3 cases" in second.stdout
     assert again.exit_code == 1
