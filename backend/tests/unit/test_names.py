@@ -8,7 +8,6 @@ from esfake.pipeline.redaction.names import (
     _subtract,
     _without_non_names,
     cued_name_spans,
-    fold,
 )
 from esfake.pipeline.text import RawText
 
@@ -33,13 +32,6 @@ def test_cue_phrases_find_capitalised_names_but_not_kinship_words(
     text: str, names: list[str]
 ) -> None:
     assert _cued(text) == names
-
-
-def test_fold_keeps_offsets_aligned() -> None:
-    text = "Huamán Ñaupari"
-
-    assert fold(text) == "huaman naupari"
-    assert len(fold(text)) == len(text)
 
 
 def test_subtract_cuts_holes_out_of_a_span() -> None:

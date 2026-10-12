@@ -95,3 +95,15 @@ def test_the_scan_sees_imports_inside_functions() -> None:
     }
 
     assert {"corpus", "evaluation", "pipeline"} <= cli_dependencies
+
+
+def test_fold_is_defined_once() -> None:
+    # docs/ARCHITECTURE_RULES.md, rule 3: rules and name redaction must fold text identically.
+    definitions = [
+        _module_name(path)
+        for path in sorted(PACKAGE_DIR.rglob("*.py"))
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+        if isinstance(node, ast.FunctionDef) and node.name == "fold"
+    ]
+
+    assert definitions == ["esfake.shared.text_folding"]

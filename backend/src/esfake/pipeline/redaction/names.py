@@ -13,11 +13,11 @@ evals/redaction/names_validation.jsonl, a set never used for tuning.
 """
 
 import re
-import unicodedata
 from collections.abc import Iterable
 from typing import Protocol
 
 from esfake.pipeline.redaction.deterministic import NAME_PATTERN
+from esfake.shared.text_folding import fold
 
 _PLACEHOLDER = re.compile(r"\[[A-Z_]+\]")
 _HAS_LETTER = re.compile(r"[^\W\d_]")
@@ -60,11 +60,6 @@ type Span = tuple[int, int]
 
 class NameFinder(Protocol):
     def find(self, text: str) -> list[Span]: ...
-
-
-def fold(text: str) -> str:
-    """Lower-case and strip accents character by character, so offsets stay aligned."""
-    return "".join(unicodedata.normalize("NFD", char)[0].lower() for char in text)
 
 
 def _subtract(span: Span, holes: Iterable[Span]) -> list[Span]:
