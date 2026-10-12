@@ -91,7 +91,7 @@ def test_the_scan_sees_imports_inside_functions() -> None:
     # Guards the guard: the CLI imports its dependencies lazily, so a scan limited to module
     # level would see almost none of them.
     cli_dependencies = {
-        package for module, package in _dependencies() if module == "esfake.cli.main"
+        package for module, package in _dependencies() if module.startswith("esfake.cli.")
     }
 
     assert {"corpus", "evaluation", "pipeline"} <= cli_dependencies
