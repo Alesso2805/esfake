@@ -652,12 +652,10 @@ def corpus_compare_models(
     ),
 ) -> None:
     """Compare the deployed embedding model with the contender (ADR-0003, amendment 1)."""
-    import time
-
     from esfake.corpus.clusters import cosine_matrix
     from esfake.corpus.dataset import read_corpus
     from esfake.corpus.pairs import read_labeled_pairs, record_ref
-    from esfake.evaluation.embedding_comparison import ModelMeasures, compare
+    from esfake.evaluation.embedding_comparison import ModelMeasures, compare, measure_latencies
     from esfake.shared.clock import SystemClock
 
     try:
@@ -675,19 +673,21 @@ def corpus_compare_models(
     texts = [by_ref[ref].text for ref in refs]
     position = {ref: i for i, ref in enumerate(refs)}
 
+    settings = ModelSettings()
+    models = load_models_config(settings.config_dir)
+
     def measure(contender: bool) -> ModelMeasures:
+        config = models.embedding_contender if contender else models.embedding
+        if config is None:
+            raise typer.BadParameter("config/models.yaml names no embedding_contender")
         embedder = _local_embedder(contender=contender)
         similarities = cosine_matrix(embedder.embed(texts))
-        embedder.embed(texts[:1])  # warm-up, not timed
-        latencies = []
-        for text in texts:  # one message at a time, as a verification embeds it
-            start = time.perf_counter()
-            embedder.embed([text])
-            latencies.append((time.perf_counter() - start) * 1000)
         return ModelMeasures(
             name=embedder.model_name,
             scores=[float(similarities[position[p.ref_a], position[p.ref_b]]) for p in labeled],
-            latencies_ms=latencies,
+            latencies_ms=measure_latencies(
+                config, settings.models_dir, texts, offline=settings.models_offline
+            ),
             token_counts=embedder.token_counts([record.text for record in records]),
             max_tokens=embedder.max_tokens,
         )
