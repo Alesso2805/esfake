@@ -25,12 +25,7 @@ LAYERS: tuple[tuple[str, ...], ...] = (
 LEVEL = {package: level for level, packages in enumerate(LAYERS) for package in packages}
 
 # (importing module, imported package): why it exists and what removes it.
-KNOWN_VIOLATIONS: dict[tuple[str, str], str] = {
-    (
-        "esfake.pipeline.similarity.internal_client",
-        "api",
-    ): "the /internal/embed contract lives in api; moves to a neutral module",
-}
+KNOWN_VIOLATIONS: dict[tuple[str, str], str] = {}
 
 
 def _module_name(path: Path) -> str:

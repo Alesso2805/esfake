@@ -9,30 +9,11 @@ import hmac
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, StringConstraints
+from pydantic import SecretStr
 
 from esfake.api.errors import install_error_handlers
 from esfake.api.state import ModelState
-
-SECRET_HEADER = "X-Internal-Secret"  # noqa: S105 (a header name, not a secret)
-MAX_TEXTS = 64
-MAX_TEXT_LENGTH = 4_000
-
-
-class EmbedRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
-
-    texts: list[Annotated[str, StringConstraints(min_length=1, max_length=MAX_TEXT_LENGTH)]] = (
-        Field(min_length=1, max_length=MAX_TEXTS)
-    )
-
-
-class EmbedResponse(BaseModel):
-    model_config = ConfigDict(hide_input_in_errors=True)
-
-    model: str
-    dimensions: int
-    vectors: list[list[float]]
+from esfake.shared.internal_contract import SECRET_HEADER, EmbedRequest, EmbedResponse
 
 
 def create_internal_app(state: ModelState, secret: SecretStr) -> FastAPI:

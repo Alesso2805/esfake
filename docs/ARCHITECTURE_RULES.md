@@ -24,13 +24,9 @@ Los paquetes de `backend/src/esfake/` se ordenan en capas, de la más baja a la 
 
 ### Excepciones conocidas
 
-Las violaciones que existían al crear la regla están listadas en `KNOWN_VIOLATIONS` de ese test, con su motivo. El test también falla cuando una excepción ya no se necesita, de modo que la lista solo puede encogerse. Cada excepción tiene una corrección prevista:
+Ninguna. `KNOWN_VIOLATIONS` en `test_architecture.py` está vacío. Si una dependencia nueva obliga a agregar una entrada, se rediseña la dependencia antes de aceptarla; el test falla además cuando una entrada ya no se necesita, de modo que la lista no puede quedarse con deuda vieja.
 
-| Importador | Importa | Corrección |
-| --- | --- | --- |
-| `pipeline.similarity.internal_client` | `api` | Mover el contrato de `/internal/embed` a un módulo neutral |
-
-No se agregan excepciones nuevas. Si un cambio las necesita, se rediseña la dependencia o se discute el orden de capas y se actualiza este documento.
+Si se discute el orden de capas, se actualiza este documento junto con el test.
 
 ## 2. Los contratos compartidos viven en la capa más baja que los usa
 

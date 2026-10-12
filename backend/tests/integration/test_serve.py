@@ -8,11 +8,11 @@ import httpx
 import pytest
 import uvicorn
 
-from esfake.api.internal import SECRET_HEADER
 from esfake.api.serve import build_servers, run_servers
 from esfake.api.state import ModelState
 from esfake.pipeline.redaction import Redactor
 from esfake.shared.config import ApiSettings
+from esfake.shared.internal_contract import SECRET_HEADER
 from tests.fakes import FakeEmbedder
 
 SECRET = "internal-test-secret"  # noqa: S105

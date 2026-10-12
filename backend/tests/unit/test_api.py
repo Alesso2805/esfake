@@ -4,10 +4,11 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
-from esfake.api.internal import SECRET_HEADER, create_internal_app
+from esfake.api.internal import create_internal_app
 from esfake.api.main import create_public_app
 from esfake.api.state import ModelState
 from esfake.pipeline.redaction import Redactor
+from esfake.shared.internal_contract import SECRET_HEADER
 from tests.fakes import FakeEmbedder
 
 SECRET = "internal-test-secret"  # noqa: S105
