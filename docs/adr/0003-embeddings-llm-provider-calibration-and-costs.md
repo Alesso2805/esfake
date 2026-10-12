@@ -214,3 +214,41 @@ The labelled pairs are committed as evidence. Changing the threshold later creat
 - Render free tier: https://render.com/docs/free
 - Aiven free plan: https://aiven.io/docs/platform/concepts/free-plan
 - DigitalOcean managed databases pricing: https://www.digitalocean.com/pricing/managed-databases
+
+## Amendment 1 (2026-10-11): how the embedding checkpoint decides, fixed before measuring
+
+§1 asks for a comparison between MiniLM and `multilingual-e5-small` on our own labelled near-duplicate pairs, and for a switch only if e5 is "clearly better". This amendment fixes what that means before any pair is labelled, as ADR-0006 did for the non-inferiority margin. The owner approved it on 2026-10-11.
+
+### Contender
+
+- `intfloat/multilingual-e5-small`, from the ONNX export in its own Hugging Face repository (`onnx/model.onnx`, fp32, about 470 MB).
+- Mean pooling, L2-normalised vectors, and the `query: ` prefix on every text, e5's convention for symmetric similarity.
+- fastembed does not ship it, so it is registered as a custom model. It is `embedding_contender` in `config/models.yaml` and the API never loads it.
+- MiniLM is compared as deployed: fastembed's quantised ONNX build.
+
+### Pairs
+
+- `esfake corpus pairs` takes half the pairs near each model's cut.
+- MiniLM's bins span cosine 0.70 to 0.98.
+- e5's bins span the range that holds the same pairs by rank. e5 rates even unrelated messages around 0.8, so the same numbers would mean different things.
+- One labelled set therefore serves both the checkpoint and the cluster threshold of whichever model wins (§6).
+
+### Measures
+
+Both models are scored on the same labelled pairs:
+
+- **AUC** of cosine similarity for "same" against "different". It needs no threshold.
+- **Best cut** by F1, with the §6 rule, and its agreement with the labels.
+- **p95 latency** to embed one message, on the development machine.
+- **Long messages:** the share of corpus messages over 128 tokens (MiniLM's training length) and over 512 tokens (e5's window), each counted with its own tokenizer.
+
+### Decision rule
+
+e5-small replaces MiniLM only if both hold:
+
+1. The lower bound of the 95 % paired bootstrap interval of AUC(e5) − AUC(MiniLM) is above 0. The bootstrap resamples pairs 10 000 times with a fixed seed.
+2. Its p95 latency per message is at most 200 ms, the budget of the similarity layer.
+
+Otherwise MiniLM stays. Switching costs a new image, a new threshold and re-clustering, and an AUC difference that the interval cannot tell from zero does not pay for that.
+
+The results go to `docs/evals/embedding-comparison.json` and to a second amendment, whichever way they fall. Latency on the production VM (ARM) is checked again in EF-18.
