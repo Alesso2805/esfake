@@ -10,11 +10,16 @@ from esfake.corpus.dataset import CorpusRecord
 from esfake.corpus.pairs import (
     ReviewPair,
     choose_threshold,
+    matched_range,
+    merge_pairs,
     read_labeled_pairs,
     record_ref,
     select_review_pairs,
     write_pairs,
 )
+from esfake.pipeline.similarity.embedder import _register
+from esfake.shared.models_config import load_models_config
+from tests.paths import CONFIG_DIR
 
 
 def _record(text: str) -> CorpusRecord:
@@ -97,3 +102,37 @@ def test_embeddings_order_does_not_change_the_matrix() -> None:
     backward = cosine_matrix(vectors[::-1].tolist())
 
     assert forward[0, 2] == pytest.approx(backward[2, 0])
+
+
+def test_the_contender_range_covers_the_same_pairs_by_rank() -> None:
+    reference = cosine_matrix(_vectors_at([0, 5, 12, 30, 60, 90]))
+    # Same ranking on another scale, as e5 rates every pair higher than MiniLM does.
+    other = 0.8 + 0.2 * reference
+    rows, cols = np.triu_indices(6, k=1)
+
+    low, high = matched_range(reference, other, 0.9, 0.999)
+
+    inside_reference = (reference[rows, cols] >= 0.9) & (reference[rows, cols] < 0.999)
+    inside_other = (other[rows, cols] >= low) & (other[rows, cols] < high)
+    assert inside_reference.tolist() == inside_other.tolist()
+    assert low > 0.9
+
+
+def test_merged_pairs_have_no_repeats_and_a_stable_order() -> None:
+    a = ReviewPair("r1", "r2", "uno", "dos")
+    b = ReviewPair("r1", "r3", "uno", "tres")
+
+    assert merge_pairs([a, b], [b]) == merge_pairs([b], [a]) == merge_pairs([b, a])
+    assert len(merge_pairs([a, b], [b])) == 2
+
+
+def test_the_contender_is_configured_with_its_prefix_and_onnx_source() -> None:
+    contender = load_models_config(CONFIG_DIR).embedding_contender
+
+    assert contender is not None
+    assert contender.name == "intfloat/multilingual-e5-small"
+    assert contender.prefix == "query: "
+    assert contender.onnx is not None
+    assert contender.onnx.model_file == "onnx/model.onnx"
+    _register(contender)
+    _register(contender)  # once per process: a second call is a no-op
