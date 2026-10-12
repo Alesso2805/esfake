@@ -5,10 +5,10 @@ import pytest
 
 from esfake.corpus.add import CorpusInputError, add_messages, load_raw_rows
 from esfake.corpus.dataset import CorpusRecord, read_corpus
-from esfake.corpus.modalities import ModalityCatalog, load_catalog
 from esfake.corpus.subcategories import SubcategoryCatalog, load_subcategories
 from esfake.pipeline.redaction import Redactor
 from esfake.shared.clock import FakeClock
+from esfake.shared.modalities import ModalityCatalog, load_catalog
 from tests.paths import CONFIG_DIR, MODALITIES_YAML
 
 HEADER = "text,label,modality,subcategory,source,reference,language\n"

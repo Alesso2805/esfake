@@ -1,43 +1,11 @@
-"""Modality catalogue, seeded from config/modalities.yaml with the same codes everywhere."""
+"""Seeds the `modalities` table from the catalogue in config/modalities.yaml."""
 
-from pathlib import Path
-from typing import Literal, Self
-
-import yaml
-from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from esfake.shared.db.models import Modality
-
-
-class ModalitySpec(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    code: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
-    kind: Literal["textual", "guidance_only"]
-    name_es: str = Field(min_length=1)
-    name_en: str = Field(min_length=1)
-    # Brand names tied to the modality; exempt from name redaction, not stored in the table.
-    brands: tuple[str, ...] = ()
-
-
-class ModalityCatalog(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    modalities: list[ModalitySpec] = Field(min_length=1)
-
-    @model_validator(mode="after")
-    def _codes_are_unique(self) -> Self:
-        codes = [modality.code for modality in self.modalities]
-        if len(codes) != len(set(codes)):
-            raise ValueError("modality codes must be unique")
-        return self
-
-
-def load_catalog(path: Path) -> ModalityCatalog:
-    return ModalityCatalog.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
+from esfake.shared.modalities import ModalityCatalog
 
 
 async def sync_modalities(engine: AsyncEngine, catalog: ModalityCatalog) -> None:

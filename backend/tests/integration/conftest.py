@@ -13,8 +13,9 @@ from alembic.config import Config
 from sqlalchemy.ext.asyncio import AsyncEngine
 from testcontainers.community.postgres import PostgresContainer
 
-from esfake.corpus.modalities import load_catalog, sync_modalities
+from esfake.corpus.modalities import sync_modalities
 from esfake.shared.db import create_engine
+from esfake.shared.modalities import load_catalog
 from tests.paths import BACKEND_DIR, MODALITIES_YAML
 
 BOOTSTRAP_DIR = BACKEND_DIR / "migrations" / "bootstrap"

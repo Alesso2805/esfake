@@ -5,7 +5,7 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
-from esfake.corpus.modalities import load_catalog
+from esfake.shared.modalities import load_catalog
 
 
 class Brand(BaseModel):

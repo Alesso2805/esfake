@@ -12,8 +12,8 @@ from typing import Literal, Self
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from esfake.corpus.modalities import load_catalog
 from esfake.pipeline.rules.fold import fold
+from esfake.shared.modalities import load_catalog
 
 type RuleLayer = Literal["rules", "injection"]
 

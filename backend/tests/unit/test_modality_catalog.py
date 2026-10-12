@@ -3,7 +3,7 @@ from collections import Counter
 import pytest
 from pydantic import ValidationError
 
-from esfake.corpus.modalities import ModalityCatalog, load_catalog
+from esfake.shared.modalities import ModalityCatalog, load_catalog
 from tests.paths import MODALITIES_YAML
 
 SPEC = {"code": "fake_prize", "kind": "textual", "name_es": "Falso premio", "name_en": "Fake prize"}
