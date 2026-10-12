@@ -15,8 +15,9 @@ from pathlib import Path
 from esfake.evaluation.stats import wilson_interval
 from esfake.pipeline.redaction import NAME_PLACEHOLDER, Redactor
 from esfake.pipeline.redaction.deterministic import redact_deterministic
-from esfake.pipeline.redaction.names import NameFinder, Span, fold
+from esfake.pipeline.redaction.names import NameFinder, Span
 from esfake.pipeline.text import RawText
+from esfake.shared.text_folding import fold
 
 _PARTICLES = {"de", "del", "la", "los", "y"}
 

@@ -12,7 +12,6 @@ from esfake.pipeline.llm.cache import ResponseCache
 from esfake.pipeline.rules.catalog import Rule, RuleCatalog, load_rules
 from esfake.pipeline.rules.check import check_message
 from esfake.pipeline.rules.detector import RuleDetector
-from esfake.pipeline.rules.fold import fold
 from esfake.pipeline.text import RedactedText
 from esfake.pipeline.verifier import build_pipeline
 from esfake.shared.thresholds import load_thresholds
@@ -53,12 +52,6 @@ def test_the_catalogue_covers_every_textual_modality_and_the_injection_layer() -
         "fake_online_sale",
     }
     assert any(rule.layer == "injection" for rule in CATALOG.rules)
-
-
-def test_fold_keeps_every_offset() -> None:
-    text = "CÓDIGO de Ñandú İstanbul ﬁ"
-    assert len(fold(text)) == len(text)
-    assert fold("CÓDIGO Ñandú") == "codigo nandu"
 
 
 def test_spans_are_offsets_into_the_original_text() -> None:

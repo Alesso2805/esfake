@@ -32,9 +32,9 @@ Si se discute el orden de capas, se actualiza este documento junto con el test.
 
 Un contrato (esquema de una petición, constante de cabecera, catálogo leído de un YAML) no se define en el proceso que lo sirve, sino en un módulo que cliente y servidor puedan importar. Un cliente nunca importa del servidor. **Verificación:** la regla 1 (el servidor está en una capa más alta que el cliente).
 
-## 3. Una sola implementación por función de dominio — por aplicar
+## 3. Una sola implementación por función de dominio
 
-Una función de dominio (por ejemplo, plegar texto a minúsculas sin acentos) existe una sola vez y se importa. Dos copias divergen y las reglas y la redacción terminan tratando el mismo texto de forma distinta. Hoy `fold()` está duplicada en `pipeline/redaction/names.py` y `pipeline/rules/fold.py`; se unifica en una PR aparte. **Verificación prevista:** test que falle ante dos definiciones con el mismo nombre en `pipeline/`.
+Una función de dominio (por ejemplo, plegar texto a minúsculas sin acentos) existe una sola vez y se importa. Dos copias divergen y las reglas y la redacción terminan tratando el mismo texto de forma distinta. `fold()` vive solo en `shared/text_folding.py`. **Verificación:** `test_architecture.py::test_fold_is_defined_once`. Cuando otra función de dominio se duplique, se agrega su nombre a ese test.
 
 ## 4. La CLI orquesta, no decide — por aplicar
 
