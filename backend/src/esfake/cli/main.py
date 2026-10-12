@@ -553,3 +553,69 @@ def corpus_validate(
     if report.problems:
         raise typer.Exit(1)
     typer.echo("Corpus valid.")
+
+
+@corpus_app.command("import")
+def corpus_import(
+    corpus: Annotated[Path, typer.Option(help="Corpus JSONL.")] = DEFAULT_CORPUS,
+) -> None:
+    """Mirror the public corpus into Postgres with its embeddings (CLAUDE.md rule 6, EF-07)."""
+    import urllib.error
+
+    from pydantic import ValidationError
+
+    from esfake.corpus.dataset import read_corpus, read_dataset_info
+    from esfake.corpus.importer import FrozenCorpusError, import_corpus
+    from esfake.pipeline.similarity.embedder import Embedder
+    from esfake.pipeline.similarity.internal_client import InternalEmbedder
+    from esfake.shared.clock import SystemClock
+    from esfake.shared.config import CorpusImportSettings
+
+    def fail(message: str) -> typer.Exit:
+        typer.secho(f"ERROR: {message}", fg=typer.colors.RED, err=True)
+        return typer.Exit(1)
+
+    try:
+        settings = CorpusImportSettings()
+    except ValidationError as error:
+        names = sorted({str(e["loc"][0]) for e in error.errors() if e["loc"]})
+        problems = [str(e["msg"]) for e in error.errors() if not e["loc"]]
+        raise fail(f"configuration: missing or invalid {names} {problems}".strip()) from None
+    info = read_dataset_info(corpus)
+    if info is None:
+        raise fail("the corpus has not been assigned yet (no dataset.json): run corpus assign")
+    embedding = load_models_config(settings.config_dir).embedding
+    if info.embedding_model != embedding.name:
+        raise fail(f"dataset.json was embedded with {info.embedding_model}, not {embedding.name}")
+    embedder: Embedder
+    if settings.internal_url is not None and settings.internal_secret is not None:
+        embedder = InternalEmbedder(
+            settings.internal_url, settings.internal_secret, embedding.name, embedding.dimensions
+        )
+    else:
+        embedder = _local_embedder()
+    records = read_corpus(corpus)
+
+    async def run() -> None:
+        engine = create_engine(settings.database_url.get_secret_value())
+        try:
+            async with engine.begin() as conn:
+                report = await import_corpus(
+                    conn,
+                    records,
+                    info,
+                    embedder.embed,
+                    actor=settings.actor,
+                    now=SystemClock().now(),
+                )
+        finally:
+            await engine.dispose()
+        typer.echo(
+            f"Dataset {info.dataset_version}: {report.inserted} inserted, {report.updated} "
+            f"corrected, {report.deleted} deleted, {report.unchanged} unchanged."
+        )
+
+    try:
+        asyncio.run(run())
+    except (FrozenCorpusError, ValueError, urllib.error.URLError) as error:
+        raise fail(str(error)) from None
