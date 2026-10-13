@@ -4,7 +4,6 @@
 call it from Sprint 0 on.
 """
 
-import asyncio
 import shutil
 import subprocess
 from decimal import Decimal
@@ -59,78 +58,33 @@ def _evaluate(
     budget_usd: Decimal | None = None,
     publish_as: str | None = None,
 ) -> None:
-    from esfake.corpus.dataset import read_corpus
-    from esfake.corpus.subcategories import load_subcategories
-    from esfake.evaluation.gate import run_gate
-    from esfake.evaluation.harness import run_cases, split_cases
-    from esfake.evaluation.metrics import compute_metrics
-    from esfake.evaluation.published import latest_published, publish
-    from esfake.evaluation.report import format_report
-    from esfake.pipeline.llm.cache import BudgetExceededError, MissingResponseError, ResponseCache
-    from esfake.pipeline.manifest import build_manifest
+    from esfake.evaluation.run import EvaluationRequest, run_evaluation
     from esfake.pipeline.redaction import build_redactor
-    from esfake.pipeline.verifier import build_pipeline
     from esfake.shared.clock import SystemClock
-    from esfake.shared.thresholds import load_thresholds
 
     config_dir = ModelSettings().config_dir
-    records = read_corpus(corpus)
-    cases = split_cases(records, "eval")
-    if not cases:
-        typer.secho(
-            "WARNING: the corpus has no `eval` cases yet (`esfake corpus assign`, EF-07); "
-            "nothing was evaluated.",
-            fg=typer.colors.YELLOW,
-            err=True,
-        )
-        return
-    index_ids = [r.case_id for r in split_cases(records, "index") if r.case_id is not None]
-    manifest = build_manifest(config_dir, _git_sha(), index_ids)
-    cache = ResponseCache(llm_cache, mode, budget_usd)
-    pipeline = build_pipeline(config_dir, cache)
-    try:
-        predictions = asyncio.run(run_cases(cases, build_redactor(config_dir), pipeline))
-    except (MissingResponseError, BudgetExceededError) as error:
-        typer.secho(f"ERROR: {error}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(1) from None
+    request = EvaluationRequest(
+        mode, corpus, evals_dir, llm_cache, config_dir, _git_sha(), budget_usd, publish_as
+    )
+    result = run_evaluation(request, lambda: build_redactor(config_dir), SystemClock())
 
-    metrics = compute_metrics(predictions)
-    published = latest_published(evals_dir)
-    hard_negatives = frozenset(
-        s.code
-        for s in load_subcategories(config_dir / "subcategories.yaml").subcategories
-        if s.hard_negative
-    )
-    gate = run_gate(
-        predictions,
-        published.baseline() if published is not None else None,
-        load_thresholds(config_dir).evaluation,
-        hard_negatives,
-    )
-    typer.echo(format_report(mode, manifest.hash, metrics, gate))
-    if mode == "record":
-        typer.echo(
-            f"Recorded {cache.live_calls} responses live for US${cache.spent_usd}; "
-            f"commit {llm_cache} with the PR."
-        )
-    if not gate.passed:
+    if result.status == "no_cases":
+        typer.secho(result.error, fg=typer.colors.YELLOW, err=True)
+        return
+    if result.status == "model_error":
+        typer.secho(result.error, fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
-    if publish_as is not None:
-        if manifest.git_sha.endswith("-dirty") or manifest.git_sha == "unknown":
-            typer.secho(
-                "ERROR: commit every change before publishing, so the manifest names the code.",
-                fg=typer.colors.RED,
-                err=True,
-            )
-            raise typer.Exit(1)
-        try:
-            path = publish(
-                evals_dir, publish_as, SystemClock().now().date(), manifest, metrics, predictions
-            )
-        except ValueError as error:
-            typer.secho(f"ERROR: {error}", fg=typer.colors.RED, err=True)
-            raise typer.Exit(1) from None
-        typer.echo(f"Published {publish_as} to {path}; commit it.")
+    if result.report is not None:
+        typer.echo(result.report)
+    if result.note is not None:
+        typer.echo(result.note)
+    if result.status == "gate_failed":
+        raise typer.Exit(1)
+    if result.status == "publish_refused":
+        typer.secho(result.error, fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+    if result.published_path is not None:
+        typer.echo(f"Published {publish_as} to {result.published_path}; commit it.")
 
 
 def eval_(
