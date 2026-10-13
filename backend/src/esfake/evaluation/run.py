@@ -6,13 +6,13 @@ evaluated, what is compared and when a version may be published is decided here
 """
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import Literal
 
-from esfake.corpus.dataset import read_corpus
+from esfake.corpus.dataset import CorpusRecord, read_corpus
 from esfake.corpus.subcategories import load_subcategories
 from esfake.evaluation.gate import run_gate
 from esfake.evaluation.harness import run_cases, split_cases
@@ -27,6 +27,8 @@ from esfake.pipeline.llm.cache import (
 )
 from esfake.pipeline.manifest import build_manifest
 from esfake.pipeline.redaction import Redactor
+from esfake.pipeline.similarity.detector import Embed, SimilarityDetector
+from esfake.pipeline.similarity.index import IndexEntry, InMemoryIndex
 from esfake.pipeline.verifier import build_pipeline
 from esfake.shared.clock import Clock
 from esfake.shared.thresholds import load_thresholds
@@ -62,9 +64,28 @@ class EvaluationResult:
     published_path: Path | None = None
 
 
+def _similarity(
+    records: Sequence[CorpusRecord], make_embed: Callable[[], Embed] | None, config_dir: Path
+) -> SimilarityDetector | None:
+    """The similarity layer over the `index` split held in memory (ADR-0002 §5), if any."""
+    index_records = [r for r in split_cases(records, "index") if r.case_id is not None]
+    if make_embed is None or not index_records:
+        return None
+    embed = make_embed()
+    index = InMemoryIndex(
+        [IndexEntry(str(r.case_id), r.label, r.modality) for r in index_records],
+        embed([r.text for r in index_records]),
+    )
+    return SimilarityDetector(embed, index, load_thresholds(config_dir).similarity)
+
+
 def run_evaluation(
-    request: EvaluationRequest, make_redactor: Callable[[], Redactor], clock: Clock
+    request: EvaluationRequest,
+    make_redactor: Callable[[], Redactor],
+    clock: Clock,
+    make_embed: Callable[[], Embed] | None = None,
 ) -> EvaluationResult:
+    """`make_embed` loads the embedding model, only when the corpus has an `index` split."""
     config_dir = request.config_dir
     records = read_corpus(request.corpus)
     cases = split_cases(records, "eval")
@@ -77,7 +98,7 @@ def run_evaluation(
     index_ids = [r.case_id for r in split_cases(records, "index") if r.case_id is not None]
     manifest = build_manifest(config_dir, request.git_sha, index_ids)
     cache = ResponseCache(request.llm_cache, request.mode, request.budget_usd)
-    pipeline = build_pipeline(config_dir, cache)
+    pipeline = build_pipeline(config_dir, cache, _similarity(records, make_embed, config_dir))
     try:
         predictions = asyncio.run(run_cases(cases, make_redactor(), pipeline))
     except (MissingResponseError, BudgetExceededError) as error:
