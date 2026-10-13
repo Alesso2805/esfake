@@ -93,7 +93,7 @@ def evaluate(finder: NameFinder, cases: list[NameCase]) -> NameRedactionReport:
         for brand in case.brands:
             brands += 1
             kept += brand in output
-        deterministic, _counts = redact_deterministic(case.text)
+        deterministic, _counts = redact_deterministic(case.text, redactor.suffixes)
         gold = _gold_spans(deterministic, case.names)
         for span in finder.find(deterministic):
             spans += 1
