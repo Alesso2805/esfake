@@ -32,3 +32,34 @@ shorteners:
   - tiny.cc
   - tinyurl.com
   - v.gd
+
+# Weights of the URL layer (owner, 2026-10-12). Policy v0 adds them to the rule weights: a brand
+# name or a lookalike alone reaches likely_scam, mixed scripts alone reach suspicious, and a
+# shortener or an accent alone reach neither, since genuine promotions use them too.
+signals:
+  url_brand_unofficial: 3.0 # a brand's name in a domain it does not own
+  url_lookalike: 3.0 # a domain that imitates an official one
+  url_mixed_script: 1.0 # one label mixes scripts, such as Latin and Cyrillic
+  url_shortener: 0.5 # never expanded
+  url_idn: 0.5 # characters outside ASCII in a single script, such as an accent
+
+# Modality of a brand-name or lookalike signal. A brand not listed here (SUNAT, RENIEC, PNP) gets
+# none, so under policy v0 it stays suspicious: no textual modality fits impersonating the state.
+brand_modalities:
+  BCP: bank_wallet_phishing
+  Interbank: bank_wallet_phishing
+  BBVA: bank_wallet_phishing
+  Scotiabank: bank_wallet_phishing
+  Banco de la Nación: bank_wallet_phishing
+  BanBif: bank_wallet_phishing
+  Banco Pichincha: bank_wallet_phishing
+  Mibanco: bank_wallet_phishing
+  Banco Falabella: bank_wallet_phishing
+  Banco Ripley: bank_wallet_phishing
+  Caja Arequipa: bank_wallet_phishing
+  Caja Huancayo: bank_wallet_phishing
+  Caja Piura: bank_wallet_phishing
+  Yape: bank_wallet_phishing
+  Plin: bank_wallet_phishing
+  Tunki: bank_wallet_phishing
+  WhatsApp: whatsapp_code_theft

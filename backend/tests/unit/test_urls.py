@@ -11,6 +11,7 @@ import esfake.pipeline.urls
 from esfake.pipeline.text import RedactedText
 from esfake.pipeline.urls.analysis import analyze_urls
 from esfake.pipeline.urls.config import UrlData, load_url_data
+from esfake.pipeline.urls.detector import UrlDetector
 from esfake.pipeline.urls.extract import find_urls
 from esfake.pipeline.urls.suffixes import PublicSuffixList, load_public_suffix_list
 from tests.paths import CONFIG_DIR
@@ -137,6 +138,7 @@ def test_url_analysis_opens_no_socket() -> None:
     )
 
     assert len(analyze_urls(redacted(text), data)) == 6
+    assert UrlDetector(data).detect(redacted(text))
 
 
 def test_the_url_package_imports_nothing_that_reaches_the_network() -> None:
