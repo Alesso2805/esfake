@@ -2,12 +2,13 @@
 
 import typer
 
-from esfake.cli import corpus_data, corpus_review, evaluation, rules, serving
+from esfake.cli import corpus_data, corpus_review, evaluation, rules, serving, similarity
 
 app = typer.Typer(no_args_is_help=True, help="¿EsFake? command-line tools.")
 evaluation.register(app)
 serving.register(app)
 rules.register(app)
+similarity.register(app)
 
 corpus_app = typer.Typer(no_args_is_help=True, help="Public corpus: add, review pairs, assign.")
 corpus_data.register(corpus_app)

@@ -19,6 +19,9 @@ class Signal(BaseModel):
     modality: str | None = None
     # (start, end) offsets into the redacted text; they feed `signals.evidence_spans`.
     spans: tuple[tuple[int, int], ...] = ()
+    # Similarity only: the neighbours behind the signal, which feed `signals.neighbor_ids`
+    # (corpus_messages ids in production, case_ids in evaluation).
+    neighbor_ids: tuple[str, ...] = ()
 
 
 class LLMUsage(BaseModel):

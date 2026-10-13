@@ -1,7 +1,6 @@
 # Decision thresholds (CLAUDE.md rule 12). Every change bumps `version`, which goes into the
-# pipeline manifest. Similarity (k, delta) and out-of-distribution thresholds arrive with
-# EF-13 and EF-14.
-version: "0.5"
+# pipeline manifest. The out-of-distribution threshold arrives with EF-14.
+version: "0.6"
 
 redaction:
   # ADR-0004 amendments 1 and 2: Wilson 95 % lower bounds on evals/redaction/names_validation.jsonl
@@ -22,6 +21,16 @@ policy_v0:
   # tunes on `eval`. `likely_scam` also needs a modality, or the verdict stays `suspicious`.
   suspicious_at: 1.0
   likely_scam_at: 3.0
+
+similarity:
+  # EF-13 (ADR-0002 §5): the layer decides only when the k nearest `index` messages are all
+  # scams and the least similar of them beats the nearest legitimate one by delta. Provisional
+  # until `esfake similarity calibrate` runs on `eval` (ADR-0003 §6); then set calibrated.
+  k: 5
+  delta: 0.05
+  calibrated: false
+  # Owner, 2026-10-12: as strong as a brand lookalike. Positive, so similarity only raises.
+  weight: 3.0
 
 urls:
   # EF-12, ADR-0005: a registered domain whose owner label is at least this similar to an

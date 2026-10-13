@@ -12,6 +12,8 @@ from esfake.corpus.dataset import CorpusRecord, Split
 from esfake.evaluation.metrics import CasePrediction
 from esfake.pipeline.normalize import normalize
 from esfake.pipeline.redaction import Redactor
+from esfake.pipeline.similarity.detector import Embed
+from esfake.pipeline.similarity.index import IndexEntry, InMemoryIndex
 from esfake.pipeline.text import RawText
 from esfake.pipeline.verifier import Verifier
 
@@ -19,6 +21,15 @@ from esfake.pipeline.verifier import Verifier
 def split_cases(records: Sequence[CorpusRecord], split: Split) -> list[CorpusRecord]:
     """Cases of one split; messages without a case_id have not been assigned yet (EF-07)."""
     return [r for r in records if r.split == split and r.case_id is not None]
+
+
+def memory_index(index_records: Sequence[CorpusRecord], embed: Embed) -> InMemoryIndex:
+    """The `index` split in memory, by case_id (ADR-0002 §5)."""
+    records = [r for r in index_records if r.case_id is not None]
+    return InMemoryIndex(
+        [IndexEntry(str(r.case_id), r.label, r.modality) for r in records],
+        embed([r.text for r in records]),
+    )
 
 
 async def run_cases(

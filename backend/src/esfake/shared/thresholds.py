@@ -38,6 +38,17 @@ class PolicyV0Thresholds(BaseModel):
         return self
 
 
+class SimilarityThresholds(BaseModel):
+    """EF-13: when similarity to known scams decides (ADR-0002 §5, ADR-0003 §6)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    k: int = Field(ge=1)
+    delta: float = Field(ge=0, le=1)
+    calibrated: bool
+    weight: float = Field(gt=0)  # positive: similarity never lowers a verdict
+
+
 class UrlThresholds(BaseModel):
     """EF-12: how close to an official domain counts as imitating it (ADR-0005 §2)."""
 
@@ -63,6 +74,7 @@ class Thresholds(BaseModel):
     redaction: RedactionThresholds
     corpus: CorpusThresholds
     policy_v0: PolicyV0Thresholds
+    similarity: SimilarityThresholds
     urls: UrlThresholds
     evaluation: EvaluationThresholds
 

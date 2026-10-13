@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
+from esfake.cli import _common
 from esfake.cli._common import DEFAULT_CORPUS
 from esfake.shared.config import ModelSettings
 from esfake.shared.models_config import load_models_config
@@ -66,7 +67,12 @@ def _evaluate(
     request = EvaluationRequest(
         mode, corpus, evals_dir, llm_cache, config_dir, _git_sha(), budget_usd, publish_as
     )
-    result = run_evaluation(request, lambda: build_redactor(config_dir), SystemClock())
+    result = run_evaluation(
+        request,
+        lambda: build_redactor(config_dir),
+        SystemClock(),
+        make_embed=lambda: _common.local_embedder().embed,
+    )
 
     if result.status == "no_cases":
         typer.secho(result.error, fg=typer.colors.YELLOW, err=True)
