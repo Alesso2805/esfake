@@ -59,80 +59,43 @@ def corpus_assign(
     """Give new messages their case_id, cluster and frozen split (CLAUDE.md rule 6, EF-07)."""
     from pydantic import ValidationError
 
-    from esfake.corpus.assign import (
-        DatasetVersionError,
-        assign,
-        next_dataset_info,
-        unassigned,
-    )
-    from esfake.corpus.dataset import (
-        read_corpus,
-        read_dataset_info,
-        write_corpus,
-        write_dataset_info,
-    )
-    from esfake.corpus.validate import EXCLUDED_REVIEW_SHARE
+    from esfake.corpus.assignment import AssignmentRequest, run_assignment
     from esfake.shared.clock import SystemClock
     from esfake.shared.config import CorpusSettings
     from esfake.shared.hmac_keys import KeyRing
-    from esfake.shared.thresholds import load_thresholds
 
-    def fail(message: str) -> typer.Exit:
-        typer.secho(f"ERROR: {message}", fg=typer.colors.RED, err=True)
-        return typer.Exit(1)
+    def keys() -> KeyRing:
+        try:
+            return KeyRing.parse(CorpusSettings().corpus_hmac_keys.get_secret_value())
+        except ValidationError, ValueError:
+            raise ValueError(
+                "set ESFAKE_CORPUS_HMAC_KEYS to <key_id>:<secret>, with a secret of at least 16 "
+                "characters (see .env.example)"
+            ) from None
 
-    config_dir = ModelSettings().config_dir
-    cut = load_thresholds(config_dir).corpus
-    if not cut.cluster_threshold_reviewed:
-        raise fail(
-            "the cluster threshold is still provisional. Review pairs with `esfake corpus pairs` "
-            "and `esfake corpus threshold`, record the value in config/thresholds.yaml and set "
-            "cluster_threshold_reviewed: true (ADR-0003, section 6)."
-        )
-    model = load_models_config(config_dir).embedding.name
-    previous = read_dataset_info(corpus)
-    records = read_corpus(corpus)
-    if new_major:
-        records = unassigned(records)
-    if all(record.split is not None for record in records):
+    def embed(texts: list[str]) -> list[list[float]]:
+        return _common.local_embedder().embed(texts)
+
+    request = AssignmentRequest(corpus, ModelSettings().config_dir, new_major)
+    result = run_assignment(request, keys, embed, SystemClock())
+    if result.status == "refused":
+        typer.secho(f"ERROR: {result.error}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+    if result.status == "nothing_new" or result.info is None or result.report is None:
         typer.echo("Nothing new to assign.")
         return
-    try:
-        keys = KeyRing.parse(CorpusSettings().corpus_hmac_keys.get_secret_value())
-    except ValidationError, ValueError:
-        raise fail(
-            "set ESFAKE_CORPUS_HMAC_KEYS to <key_id>:<secret>, with a secret of at least 16 "
-            "characters (see .env.example)"
-        ) from None
-    try:
-        info = next_dataset_info(
-            previous, threshold=cut.cluster_threshold, embedding_model=model, new_major=new_major
-        )
-    except DatasetVersionError as error:
-        raise fail(str(error)) from None
-
-    vectors = _common.local_embedder().embed([record.text for record in records])
-    today = SystemClock().now().date()
-    try:
-        result, report = assign(records, vectors, cut.cluster_threshold, keys, today)
-    except ValueError as error:
-        raise fail(str(error)) from None
-    info = info.model_copy(
-        update={"discarded_synthetic": info.discarded_synthetic + report.discarded_synthetic}
-    )
-    write_corpus(corpus, result)
-    write_dataset_info(corpus, info)
+    report = result.report
     typer.echo(
-        f"Dataset {info.dataset_version}: assigned {report.new - report.discarded_synthetic} new "
-        f"messages ({dict(sorted(report.splits.items()))}); {report.new_clusters} new clusters, "
+        f"Dataset {result.info.dataset_version}: assigned "
+        f"{report.new - report.discarded_synthetic} new messages "
+        f"({dict(sorted(report.splits.items()))}); {report.new_clusters} new clusters, "
         f"{report.inherited} joined an existing one, {report.excluded} excluded, "
         f"{report.discarded_synthetic} synthetic discarded."
     )
-    excluded = sum(record.split == "excluded" for record in result)
-    if result and excluded / len(result) > EXCLUDED_REVIEW_SHARE:
+    if result.threshold_needs_review:
         typer.secho(
-            f"WARNING: {excluded} of {len(result)} messages are excluded, over 5 %: review the "
-            "cluster threshold (a new major dataset version).",
+            f"WARNING: {result.excluded} of {result.total} messages are excluded, over 5 %: "
+            "review the cluster threshold (a new major dataset version).",
             fg=typer.colors.YELLOW,
             err=True,
         )

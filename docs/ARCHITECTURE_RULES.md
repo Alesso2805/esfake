@@ -36,9 +36,9 @@ Un contrato (esquema de una petición, constante de cabecera, catálogo leído d
 
 Una función de dominio (por ejemplo, plegar texto a minúsculas sin acentos) existe una sola vez y se importa. Dos copias divergen y las reglas y la redacción terminan tratando el mismo texto de forma distinta. `fold()` vive solo en `shared/text_folding.py`. **Verificación:** `test_architecture.py::test_fold_is_defined_once`. Cuando otra función de dominio se duplique, se agrega su nombre a ese test.
 
-## 4. La CLI orquesta, no decide — por aplicar
+## 4. La CLI orquesta, no decide
 
-`cli/` traduce opciones y códigos de salida; la lógica de negocio (qué se evalúa, qué se publica, qué se asigna) vive en `evaluation/` y `corpus/`. `cli/main.py` supera las 700 líneas y se divide por área antes de agregar `label`, `report` y `redteam`. **Verificación prevista:** límite de tamaño por archivo del paquete `cli`.
+`cli/` traduce opciones y códigos de salida; la lógica de negocio (qué se evalúa, qué se publica, qué se asigna) vive en `evaluation/` y `corpus/`. Las dos orquestaciones que estaban en la CLI ya salieron: `esfake eval` usa `evaluation/run.py` y `esfake corpus assign` usa `corpus/assignment.py`, servicios sin `typer`, con el reloj y las dependencias inyectados y un resultado tipado. La CLI está dividida por área (`cli/{_common,serving,rules,evaluation,corpus_data,corpus_review}.py`) y `cli/main.py` solo registra los comandos. **Verificación:** `test_architecture.py::test_cli_modules_stay_small`, un máximo de 300 líneas por archivo de `cli/`.
 
 ## 5. El texto crudo no cruza la frontera de la redacción
 
