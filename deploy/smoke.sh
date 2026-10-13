@@ -4,8 +4,16 @@
 # listener is not published (CLAUDE.md rule 9).
 set -eu
 
-api="${ESFAKE_SMOKE_API:-http://127.0.0.1:8000}"
-web="${ESFAKE_SMOKE_WEB:-http://127.0.0.1:3000}"
+# Host ports as docker-compose.yml publishes them: from the environment, else from .env.
+env_value() {
+    if [ -f .env ]; then
+        sed -n "s/^$1=//p" .env | tail -n 1
+    fi
+}
+api_port="${ESFAKE_API_PORT:-$(env_value ESFAKE_API_PORT)}"
+web_port="${ESFAKE_WEB_PORT:-$(env_value ESFAKE_WEB_PORT)}"
+api="${ESFAKE_SMOKE_API:-http://127.0.0.1:${api_port:-8000}}"
+web="${ESFAKE_SMOKE_WEB:-http://127.0.0.1:${web_port:-3000}}"
 internal="${ESFAKE_SMOKE_INTERNAL:-http://127.0.0.1:8001}"
 
 check() {

@@ -1,18 +1,29 @@
-"""Manual check of the rule layer: what a message triggers, for reviewing config/rules.yaml."""
+"""Manual check of the cheap layers: what a message triggers in rules and URLs.
+
+For reviewing config/rules.yaml and config/urls.yaml by hand. Similarity and the judge need
+the corpus index and the model, so they stay out of this local aid.
+"""
 
 from collections.abc import Sequence
+from typing import Protocol
 
 from esfake.pipeline.decision.policy_v0 import decide
-from esfake.pipeline.rules.detector import RuleDetector
 from esfake.pipeline.text import RedactedText
+from esfake.pipeline.verdict import Signal
 from esfake.shared.thresholds import PolicyV0Thresholds
 
 _MAX_SNIPPET = 60
 
 
-def check_message(message: RedactedText, detector: RuleDetector, policy: PolicyV0Thresholds) -> str:
+class _Detector(Protocol):
+    def detect(self, message: RedactedText) -> Sequence[Signal]: ...
+
+
+def check_message(
+    message: RedactedText, detectors: Sequence[_Detector], policy: PolicyV0Thresholds
+) -> str:
     """Level, score and every signal with the text that triggered it (local terminal only)."""
-    signals = detector.detect(message)
+    signals = [signal for detector in detectors for signal in detector.detect(message)]
     verdict = decide(signals, policy)
     head = f"{verdict.level} (score {verdict.score:.1f}, modality {verdict.modality or '-'})"
     lines = [head]
@@ -22,7 +33,7 @@ def check_message(message: RedactedText, detector: RuleDetector, policy: PolicyV
             f"{_snippets(message.value, signal.spans)}"
         )
     if not signals:
-        lines.append("  (no rule matched)")
+        lines.append("  (no rule or URL signal matched)")
     return "\n".join(lines)
 
 
