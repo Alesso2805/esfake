@@ -38,6 +38,14 @@ class PolicyV0Thresholds(BaseModel):
         return self
 
 
+class UrlThresholds(BaseModel):
+    """EF-12: how close to an official domain counts as imitating it (ADR-0005 §2)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    lookalike_min_similarity: float = Field(gt=0, le=1)
+
+
 class EvaluationThresholds(BaseModel):
     """ADR-0006 B: absolute floors on `eval`, enforced only when enabled."""
 
@@ -55,6 +63,7 @@ class Thresholds(BaseModel):
     redaction: RedactionThresholds
     corpus: CorpusThresholds
     policy_v0: PolicyV0Thresholds
+    urls: UrlThresholds
     evaluation: EvaluationThresholds
 
 
