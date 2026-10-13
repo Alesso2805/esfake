@@ -9,7 +9,7 @@ never produce `no_signals` (CLAUDE.md rule 3).
 import asyncio
 from collections.abc import Callable, Sequence
 
-from esfake.pipeline.similarity.index import SimilarityIndex
+from esfake.pipeline.similarity.index import Neighbor, SimilarityIndex
 from esfake.pipeline.text import RedactedText
 from esfake.pipeline.verdict import Signal
 from esfake.shared.thresholds import SimilarityThresholds
@@ -17,6 +17,16 @@ from esfake.shared.thresholds import SimilarityThresholds
 type Embed = Callable[[list[str]], list[list[float]]]
 
 SIGNAL_CODE = "similar_known_scam"
+
+
+def decides(nearest: Sequence[Neighbor], legit: Neighbor | None, k: int, delta: float) -> bool:
+    """The rule of the layer, shared with calibration: the k nearest are all scams and the least
+    similar of them beats the nearest legitimate message by delta. `nearest` may hold more than k,
+    most similar first."""
+    first = nearest[:k]
+    if len(first) < k or any(neighbor.label != "scam" for neighbor in first):
+        return False
+    return legit is None or min(n.similarity for n in first) >= legit.similarity + delta
 
 
 class SimilarityDetector:
@@ -32,10 +42,8 @@ class SimilarityDetector:
         [vector] = await asyncio.to_thread(self._embed, [message.value])
         k, delta = self._thresholds.k, self._thresholds.delta
         nearest = await self._index.nearest(vector, k)
-        if len(nearest) < k or any(neighbor.label != "scam" for neighbor in nearest):
-            return []
         legit = await self._index.nearest(vector, 1, label="legit")
-        if legit and min(n.similarity for n in nearest) < legit[0].similarity + delta:
+        if not decides(nearest, legit[0] if legit else None, k, delta):
             return []
         modalities = {neighbor.modality for neighbor in nearest}
         return [

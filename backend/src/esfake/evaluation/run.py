@@ -15,7 +15,7 @@ from typing import Literal
 from esfake.corpus.dataset import CorpusRecord, read_corpus
 from esfake.corpus.subcategories import load_subcategories
 from esfake.evaluation.gate import run_gate
-from esfake.evaluation.harness import run_cases, split_cases
+from esfake.evaluation.harness import memory_index, run_cases, split_cases
 from esfake.evaluation.metrics import compute_metrics
 from esfake.evaluation.published import latest_published, publish
 from esfake.evaluation.report import format_report
@@ -28,7 +28,6 @@ from esfake.pipeline.llm.cache import (
 from esfake.pipeline.manifest import build_manifest
 from esfake.pipeline.redaction import Redactor
 from esfake.pipeline.similarity.detector import Embed, SimilarityDetector
-from esfake.pipeline.similarity.index import IndexEntry, InMemoryIndex
 from esfake.pipeline.verifier import build_pipeline
 from esfake.shared.clock import Clock
 from esfake.shared.thresholds import load_thresholds
@@ -72,11 +71,9 @@ def _similarity(
     if make_embed is None or not index_records:
         return None
     embed = make_embed()
-    index = InMemoryIndex(
-        [IndexEntry(str(r.case_id), r.label, r.modality) for r in index_records],
-        embed([r.text for r in index_records]),
+    return SimilarityDetector(
+        embed, memory_index(index_records, embed), load_thresholds(config_dir).similarity
     )
-    return SimilarityDetector(embed, index, load_thresholds(config_dir).similarity)
 
 
 def run_evaluation(
