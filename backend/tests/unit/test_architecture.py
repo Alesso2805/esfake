@@ -107,3 +107,17 @@ def test_fold_is_defined_once() -> None:
     ]
 
     assert definitions == ["esfake.shared.text_folding"]
+
+
+# docs/ARCHITECTURE_RULES.md, rule 4: the CLI orchestrates. A CLI module that outgrows this has
+# taken on logic that belongs in corpus/ or evaluation/.
+MAX_CLI_LINES = 300
+
+
+def test_cli_modules_stay_small() -> None:
+    sizes = {
+        path.name: len(path.read_text(encoding="utf-8").splitlines())
+        for path in sorted((PACKAGE_DIR / "cli").glob("*.py"))
+    }
+
+    assert {name: lines for name, lines in sizes.items() if lines > MAX_CLI_LINES} == {}
