@@ -1,0 +1,34 @@
+# URL analysis without network requests (ADR-0005, EF-12). The data lives in this repository and
+# every change is a reviewed commit, so it changes the pipeline manifest.
+version: "1"
+
+# Dated snapshot of https://publicsuffix.org/list/public_suffix_list.dat (MPL 2.0); its
+# VERSION line says when it was taken. Refreshing it is a manual, reviewed commit.
+public_suffix_list: url_data/public_suffix_list.dat
+
+# Unicode 16.0.0 confusables for UTS #39 skeletons (Unicode licence), the same Unicode version as
+# Python 3.14's unicodedata, so NFKC and skeletons agree.
+confusables: url_data/confusables.txt
+
+# Registered domains of URL shorteners. A shortener is a signal by itself; it is never expanded.
+# Reviewed 2026-10-12; add the ones that show up in the corpus.
+shorteners:
+  - acortar.link
+  - bit.ly
+  - bl.ink
+  - buff.ly
+  - cutt.ly
+  - goo.gl
+  - is.gd
+  - lnkd.in
+  - ow.ly
+  - rb.gy
+  - rebrand.ly
+  - s.id
+  - short.gy
+  - shorturl.at
+  - t.co
+  - t.ly
+  - tiny.cc
+  - tinyurl.com
+  - v.gd
