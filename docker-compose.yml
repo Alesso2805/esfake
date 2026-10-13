@@ -56,7 +56,9 @@ services:
     <<: *backend
     command: ["esfake", "serve"]
     ports:
-      - "127.0.0.1:8000:8000" # public listener: the only published port
+      # Public listener, the only published port. ESFAKE_API_PORT moves it on the host when
+      # another project already uses 8000.
+      - "127.0.0.1:${ESFAKE_API_PORT:-8000}:8000"
     expose:
       - "8001" # internal listener: reachable on the Compose network, never published
     depends_on:
@@ -90,7 +92,7 @@ services:
       dockerfile: web/Dockerfile
     image: esfake-web:local
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${ESFAKE_WEB_PORT:-3000}:3000"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 5s
