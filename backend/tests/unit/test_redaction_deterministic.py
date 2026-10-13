@@ -10,10 +10,14 @@ import pytest
 from esfake.pipeline.redaction import Redactor
 from esfake.pipeline.redaction.deterministic import classify_number, redact_deterministic
 from esfake.pipeline.text import RawText
+from esfake.pipeline.urls.config import load_url_data
+from tests.paths import CONFIG_DIR
+
+SUFFIXES = load_url_data(CONFIG_DIR).suffixes
 
 
 def _redact(text: str) -> str:
-    return redact_deterministic(text)[0]
+    return redact_deterministic(text, SUFFIXES)[0]
 
 
 def _digits(text: str) -> str:
@@ -74,10 +78,26 @@ def test_every_canary_format_is_redacted(canary: str, placeholders: set[str]) ->
         ("Escríbeme a wa.me/51987654321", "Escríbeme a wa.me/[PHONE]"),
         ("Mira https://bit.ly/3xYz9Ab", "Mira https://bit.ly/3xYz9Ab"),
         ("Valida en www.yape-premios.net/#ganador=rosa", "Valida en www.yape-premios.net/#[QUERY]"),
+        # Redactor v3: a bare host is a URL too, so its query goes.
+        ("Paga en bcp-seguro.com/pago?user=jose ya", "Paga en bcp-seguro.com/pago?[QUERY] ya"),
+        # What comes before "@" goes, and the real host stays for URL analysis.
+        (
+            "https://www.bcp.com.pe@bcp-validacion.com/login?id=77",
+            "https://[USERINFO]@bcp-validacion.com/login?[QUERY]",
+        ),
+        ("https://jperez:clave123@evil.com/x", "https://[USERINFO]@evil.com/x"),
+        # A link written with a scheme loses its query whatever its host.
+        ("http://192.168.0.1/login?token=abc", "http://192.168.0.1/login?[QUERY]"),
     ],
 )
 def test_urls_keep_their_host_and_lose_identifiers(given: str, expected: str) -> None:
     assert _redact(given) == expected
+
+
+def test_an_address_whose_local_part_looks_like_a_domain_is_an_address() -> None:
+    assert _redact("Escribe a maria.pe@gmail.com o soporte@bcp.com.pe") == (
+        "Escribe a [EMAIL] o [EMAIL]"
+    )
 
 
 @pytest.mark.parametrize(
@@ -123,3 +143,13 @@ def test_redactor_reports_counts_per_type() -> None:
 
     assert redacted.value == "Soy Rosa, DNI [DNI], llámame al [PHONE] o escribe a [EMAIL]"
     assert redacted.counts == {"dni": 1, "phone": 1, "email": 1}
+
+
+def test_userinfo_is_counted_and_the_analysis_still_sees_the_real_host() -> None:
+    from esfake.pipeline.urls.analysis import analyze_urls
+
+    redacted = Redactor().redact(RawText("Entra a https://www.bcp.com.pe@bcp-validacion.com/x"))
+    [finding] = analyze_urls(redacted, load_url_data(CONFIG_DIR))
+
+    assert redacted.counts == {"url_userinfo": 1}
+    assert (finding.host, finding.brand_token) == ("bcp-validacion.com", "BCP")

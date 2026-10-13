@@ -178,3 +178,42 @@ CI checks both on the validation set.
 - **Streets and places named after people**, such as "Javier Prado".
 - **Lowercase names.**
 - **Synthetic sets.** Both sets are still synthetic. The floors must be re-measured on real messages (EF-09).
+
+## Amendment 3 (2026-10-13): redactor v3, URLs found the way URL analysis finds them
+
+### What happened
+
+Building URL analysis (EF-12) exposed two gaps in how redaction treated URLs:
+
+1. **Bare hosts were not URLs.** Only links that started with `http(s)://` or `www.` were recognised. In `bcp-seguro.com/pago?user=jose` the query string stayed in the stored text. Number rules caught digit runs such as a DNI, but a non-numeric identifier survived, against §1.
+2. **The e-mail pattern swallowed the real host.** It ran first, so in `https://www.bcp.com.pe@bcp-validacion.com/…` it turned `pe@bcp-validacion.com` into `[EMAIL]`. The domain the link actually opens was erased before URL analysis could see it.
+
+### Change (redactor version 3)
+
+- **URLs are found first,** with `find_url_spans`, the same function URL analysis uses (`docs/ARCHITECTURE_RULES.md`, rule 3). It recognises:
+  - anything written with a scheme, whatever its host, so a link to a bare IP also loses its query;
+  - a bare host whose top-level label the vendored Public Suffix List knows, unless an `@` follows it, in which case it is the local part of an address.
+- **In every URL:**
+  - the host stays;
+  - whatever comes before `@` (credentials, or a bank's name used as bait) becomes `[USERINFO]`, counted as `url_userinfo`;
+  - the query and the fragment become `[QUERY]`;
+  - digit runs in the path are redacted as before (`wa.me/[PHONE]`).
+- **Between URLs,** the e-mail and number patterns run as before.
+- **The redactor carries the Public Suffix List.** Without one, it loads the vendored list of the configured config directory, so no redactor can skip bare-host URLs.
+- **The host is read by a small hand-written parser.** Python's `urlsplit` rejects a bracketed `[USERINFO]@host` as a malformed IPv6 address.
+
+### Measurements (es_core_news_lg, validation set)
+
+| Measure | v3 | v2 | Floor |
+| --- | --- | --- | --- |
+| Name recall | 115 of 120, 95.8 %, lower bound 0.906 | Same | 0.90 |
+| Name precision | 138 of 146 spans, 94.5 % | Same | 0.89 |
+| Brands kept | 26 of 26 | Same | — |
+
+The deterministic canaries are still redacted at 100 %, in the unit and integration tests.
+
+### Consequences
+
+- `REDACTOR_VERSION` becomes `3`, which changes the pipeline manifest.
+- Nothing redacted by version 2 is stored in production yet, so no stored text needs re-redaction.
+- The committed corpus was redacted with version 2. None of its URLs carries a userinfo part or a bare-host query, and the next `esfake corpus add` uses version 3.

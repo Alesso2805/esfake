@@ -2,10 +2,18 @@
 
 Every item becomes a typed placeholder, so the rules still see that, for instance, a phone
 number was there. The floor for these types is 100 % on the canary set (ADR-0004 §2).
+
+URLs are found first, with the same definition as URL analysis (`urls.extract.find_url_spans`),
+so a bare "bcp-seguro.com/pago?user=jose" loses its query too, and an address never swallows the
+host of "https://www.bcp.com.pe@evil.com". E-mail addresses and numbers are redacted in the text
+between URLs.
 """
 
 import re
 from collections import Counter
+
+from esfake.pipeline.urls.extract import find_url_spans
+from esfake.pipeline.urls.suffixes import PublicSuffixList
 
 PLACEHOLDERS = {
     "email": "[EMAIL]",
@@ -14,12 +22,11 @@ PLACEHOLDERS = {
     "phone": "[PHONE]",
     "dni": "[DNI]",
     "url_query": "[QUERY]",
+    "url_userinfo": "[USERINFO]",
     "yape_holder": "[NAME]",
 }
 
 _EMAIL = re.compile(r"(?<![\w.+-])[\w.+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+")
-_URL = re.compile(r"(?:https?://|www\.)[^\s<>\"']+|\b[a-z0-9-]+\.me/[^\s<>\"']+", re.IGNORECASE)
-_URL_HOST = re.compile(r"((?:https?://)?[^/?#]+)(.*)", re.DOTALL)
 
 # Digits with the separators people use when writing numbers: spaces, hyphens, parentheses.
 # Commas and dots are left out on purpose, so amounts such as "S/ 1,500.00" are never touched.
@@ -87,35 +94,41 @@ def _redact_numbers(text: str, counts: Counter[str]) -> str:
 
 
 def _redact_url(url: str, counts: Counter[str]) -> str:
-    # The host stays: URL analysis needs it and it is not personal data. Query strings and
-    # fragments often carry a victim's identifiers, and paths can hold a phone (wa.me/51...).
-    match = _URL_HOST.fullmatch(url)
-    host, rest = (match.group(1), match.group(2)) if match else ("", url)
-    query = re.search(r"[?#]", rest)
-    path = rest if query is None else rest[: query.start()]
-    redacted = host + _redact_numbers(path, counts)
+    # The host stays: URL analysis needs it and it is not personal data. What comes before "@"
+    # (a user name, a password, or a bank's name as bait), the query and the fragment often carry
+    # a victim's identifiers, and paths can hold a phone (wa.me/51...).
+    scheme, separator, rest = url.partition("://") if "://" in url else ("", "", url)
+    end = next((i for i, char in enumerate(rest) if char in "/?#"), len(rest))
+    netloc, tail = rest[:end], rest[end:]
+    if "@" in netloc:
+        counts["url_userinfo"] += 1
+        netloc = PLACEHOLDERS["url_userinfo"] + "@" + netloc.rsplit("@", 1)[1]
+    query = re.search(r"[?#]", tail)
+    path = tail if query is None else tail[: query.start()]
+    redacted = scheme + separator + netloc + _redact_numbers(path, counts)
     if query is not None:
         counts["url_query"] += 1
         redacted += query.group() + PLACEHOLDERS["url_query"]
     return redacted
 
 
-def redact_deterministic(text: str) -> tuple[str, Counter[str]]:
-    counts: Counter[str] = Counter()
-
+def _redact_plain(text: str, counts: Counter[str]) -> str:
     def replace_email(_match: re.Match[str]) -> str:
         counts["email"] += 1
         return PLACEHOLDERS["email"]
 
-    text = _EMAIL.sub(replace_email, text)
+    return _redact_numbers(_EMAIL.sub(replace_email, text), counts)
 
+
+def redact_deterministic(text: str, suffixes: PublicSuffixList) -> tuple[str, Counter[str]]:
+    counts: Counter[str] = Counter()
     pieces: list[str] = []
     position = 0
-    for match in _URL.finditer(text):
-        pieces.append(_redact_numbers(text[position : match.start()], counts))
-        pieces.append(_redact_url(match.group(), counts))
-        position = match.end()
-    pieces.append(_redact_numbers(text[position:], counts))
+    for span in find_url_spans(text, suffixes):
+        pieces.append(_redact_plain(text[position : span.start], counts))
+        pieces.append(_redact_url(span.url, counts))
+        position = span.end
+    pieces.append(_redact_plain(text[position:], counts))
     text = "".join(pieces)
 
     def replace_holder(match: re.Match[str]) -> str:
