@@ -1,7 +1,9 @@
+import logging
 from collections.abc import AsyncIterator
 
 import httpx
 import pytest
+from litestar.testing import AsyncTestClient
 from pydantic import SecretStr
 
 from esfake.api.internal import create_internal_app
@@ -22,8 +24,7 @@ def state() -> ModelState:
 
 @pytest.fixture
 async def public(state: ModelState) -> AsyncIterator[httpx.AsyncClient]:
-    transport = httpx.ASGITransport(app=create_public_app(state))
-    async with httpx.AsyncClient(transport=transport, base_url="http://public") as client:
+    async with AsyncTestClient(create_public_app(state)) as client:
         yield client
 
 
@@ -111,3 +112,21 @@ async def test_public_app_does_not_expose_internal_routes(public: httpx.AsyncCli
     response = await public.post("/internal/embed", json={"texts": ["hola"]}, headers=AUTH)
 
     assert response.status_code == 404
+
+
+async def test_public_app_publishes_its_openapi_schema(public: httpx.AsyncClient) -> None:
+    response = await public.get("/schema/openapi.json")
+
+    assert response.status_code == 200
+    assert response.json()["info"]["title"] == "¿EsFake? API"
+    assert set(response.json()["paths"]) == {"/healthz", "/readyz"}
+
+
+def test_building_the_apps_keeps_the_structlog_handlers(state: ModelState) -> None:
+    root = logging.getLogger()
+    handlers = list(root.handlers)
+
+    create_public_app(state)
+    create_internal_app(state, SecretStr(SECRET))
+
+    assert root.handlers == handlers
