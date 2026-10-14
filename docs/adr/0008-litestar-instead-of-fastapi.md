@@ -36,11 +36,12 @@ Nothing blocks Python 3.14 or the arm64 production VM (ADR-0003 §5).
 - **Validation errors never echo the request** (`CLAUDE.md` rule 4; ADR-0004 §1).
   - Litestar answers a `ValidationException` with 400 and a JSON body that can describe the input. A handler turns it into 422 with an empty body.
   - The handler returns `content=b""`, because `content=None` serialises to `null`.
-  - A request body that is not valid JSON also answers 422 with an empty body, as it did under FastAPI.
+  - A request body that is not valid JSON also answers 422 with an empty body, as it did under FastAPI. Litestar raises a bare `ClientException` for it, also 400, so the handler is keyed by status 400 rather than by `ValidationException`. Litestar matches status codes before exception types, so 401 and 404 keep their own handling.
 - **The shared secret.** The internal app's shared secret is checked by a guard with `hmac.compare_digest`, which raises `NotAuthorizedException` (401).
 - **Status codes of the internal POST routes.**
-  - Both declare `status_code=200`, because Litestar defaults POST to 201 and the CLI and the channel worker expect 200.
+  - Both declare `status_code=200`, as under FastAPI, because Litestar defaults POST to 201. Today's only client, the CLI, accepts any 2xx, but the contract stays 200.
   - `/internal/verify` keeps answering 501 until the pipeline is wired in (EF-20).
+- **Logging stays with structlog.** Both apps run with `logging_config=None`. Litestar's default config calls `dictConfig` when the app is built and replaces the root handlers that `shared/logging.py` set up. Litestar turns an unexpected exception into a 500 without re-raising it, so uvicorn no longer logs it. An `after_exception` hook logs its type, route and stack, without its message, which may quote text.
 - **Pydantic stays.** Request and response models stay Pydantic v2 (`shared/internal_contract.py`), served through Litestar's Pydantic plugin.
 - **OpenAPI.** It stays enabled on the public app, at Litestar's default path. The internal app has `openapi_config=None`.
 
@@ -49,7 +50,7 @@ Nothing blocks Python 3.14 or the arm64 production VM (ADR-0003 §5).
 ## Consequences
 
 - **Contract differences that remain.** Status codes do not change; two other things do:
-  - Error bodies change shape, from FastAPI's `{"detail": ...}` to Litestar's `{"status_code": ..., "detail": ...}`. The CLI and the worker read only the status code.
+  - Error bodies change shape, from FastAPI's `{"detail": ...}` to Litestar's `{"status_code": ..., "detail": ...}`. The CLI reads only the status code of an error, and the channel worker does not call the API yet.
   - The public OpenAPI document moves from `/docs` and `/openapi.json` to `/schema` and `/schema/openapi.json`.
 - **New runtime dependencies come with Litestar:** msgspec, multidict, polyfactory, rich, rich-click, click, multipart and litestar-htmx. httpx, until now a development dependency of the tests, is now a runtime dependency. The image grows a little.
 - **One more thing to learn.** Guards, plugins and Litestar's exception model replace FastAPI's dependencies and exception handlers.

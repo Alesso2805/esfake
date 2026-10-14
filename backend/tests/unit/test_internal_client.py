@@ -2,8 +2,8 @@ import asyncio
 import json
 from urllib.parse import urlsplit
 
-import httpx
 import pytest
+from litestar.testing import AsyncTestClient
 from pydantic import SecretStr
 
 from esfake.api.internal import create_internal_app
@@ -25,8 +25,7 @@ def internal_api(secret: SecretStr = SECRET) -> tuple[list[int], InternalEmbedde
         batches.append(len(json.loads(body)["texts"]))
 
         async def send() -> bytes:
-            transport = httpx.ASGITransport(app=api)
-            async with httpx.AsyncClient(transport=transport, base_url="http://api") as client:
+            async with AsyncTestClient(api) as client:
                 response = await client.post(urlsplit(url).path, content=body, headers=headers)
             response.raise_for_status()
             return response.content

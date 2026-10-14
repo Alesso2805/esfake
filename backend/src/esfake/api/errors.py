@@ -8,10 +8,6 @@ import traceback
 from typing import Any
 
 import structlog
-from fastapi import FastAPI
-from fastapi import Request as FastAPIRequest
-from fastapi import Response as FastAPIResponse
-from fastapi.exceptions import RequestValidationError
 from litestar import Request, Response
 from litestar.enums import MediaType
 from litestar.exceptions import HTTPException
@@ -46,12 +42,3 @@ def log_unexpected(exc: Exception, scope: Scope) -> None:
         error=type(exc).__name__,
         stack="".join(traceback.format_tb(exc.__traceback__)),
     )
-
-
-async def _validation_error(_request: FastAPIRequest, _exc: Exception) -> FastAPIResponse:
-    return FastAPIResponse(status_code=422)
-
-
-def install_error_handlers(app: FastAPI) -> None:
-    """FastAPI handler, kept until the internal app moves to Litestar (ADR-0008)."""
-    app.add_exception_handler(RequestValidationError, _validation_error)
