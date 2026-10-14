@@ -95,8 +95,8 @@ Reglas, URLs y similitud pueden decidir solas; la similitud solo puede subir el 
 
 | Componente | Tecnología | Responsabilidad |
 | --- | --- | --- |
-| `esfake.api` | FastAPI | En producción, el único proceso que carga el modelo de embeddings y ejecuta el pipeline; verificación web síncrona; webhooks (responden 200 de inmediato y encolan); readiness solo con el modelo cargado; obtiene la IP del cliente solo de una lista de proxies de confianza |
-| `esfake.api` (listener interno) | FastAPI, puerto no publicado | `/internal/verify` para el worker y /internal/embed para la CLI, con secreto compartido; segundo uvicorn.Server en el mismo loop de asyncio, que comparte el modelo cargado; no es alcanzable desde fuera |
+| `esfake.api` | Litestar 2.x (ADR-0008) | En producción, el único proceso que carga el modelo de embeddings y ejecuta el pipeline; verificación web síncrona; webhooks (responden 200 de inmediato y encolan); readiness solo con el modelo cargado; obtiene la IP del cliente solo de una lista de proxies de confianza |
+| `esfake.api` (listener interno) | Litestar 2.x, puerto no publicado | `/internal/verify` para el worker y /internal/embed para la CLI, con secreto compartido; segundo uvicorn.Server en el mismo loop de asyncio, que comparte el modelo cargado; no es alcanzable desde fuera |
 | `worker channels` | Python, asyncpg | Despierta con `LISTEN/NOTIFY` por una conexión directa, no por el pooler (respaldo cada 5 s), llama a `/internal/verify`, responde por la API del canal y marca `sent_at` |
 | `worker maintenance` | Python | Vacía textos vencidos, borra direcciones de respuesta y filas enviadas o fallidas a las 24 h, borra una vez al mes el corpus donado con retain_until vencido (un solo incremento de dataset_version), purga ventanas de rate limit y cierra los topes |
 | `web` | Next.js | Aviso de privacidad, verificación pública, ejemplos fijados, modo técnico y página de resultados |

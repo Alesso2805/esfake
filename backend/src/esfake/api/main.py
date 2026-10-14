@@ -1,26 +1,38 @@
 """Public listener: the only port Docker Compose publishes."""
 
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from litestar import Litestar, Response, get
+from litestar.openapi import OpenAPIConfig, ResponseSpec
+from litestar.status_codes import HTTP_503_SERVICE_UNAVAILABLE
 
-from esfake.api.errors import install_error_handlers
+from esfake.api.errors import EXCEPTION_HANDLERS, log_unexpected
 from esfake.api.state import ModelState
 
 
-def create_public_app(state: ModelState) -> FastAPI:
-    app = FastAPI(title="¿EsFake? API", version="0.1.0")
-    install_error_handlers(app)
-
-    @app.get("/healthz")
+def create_public_app(state: ModelState) -> Litestar:
+    @get("/healthz")
     async def healthz() -> dict[str, str]:
         """Liveness: the process answers, whether or not the model is loaded."""
         return {"status": "ok"}
 
-    @app.get("/readyz", responses={503: {"description": "Model still loading"}})
-    async def readyz() -> JSONResponse:
+    @get(
+        "/readyz",
+        responses={
+            HTTP_503_SERVICE_UNAVAILABLE: ResponseSpec(
+                data_container=dict[str, str], description="Model still loading"
+            )
+        },
+    )
+    async def readyz() -> Response[dict[str, str]]:
         """Readiness: only once the embedding model is loaded."""
         if not state.ready:
-            return JSONResponse({"status": "loading"}, status_code=503)
-        return JSONResponse({"status": "ready"})
+            return Response({"status": "loading"}, status_code=HTTP_503_SERVICE_UNAVAILABLE)
+        return Response({"status": "ready"})
 
-    return app
+    return Litestar(
+        route_handlers=[healthz, readyz],
+        openapi_config=OpenAPIConfig(title="¿EsFake? API", version="0.1.0"),
+        exception_handlers=EXCEPTION_HANDLERS,
+        after_exception=[log_unexpected],
+        # Litestar's default config would replace the structlog handlers on the root logger.
+        logging_config=None,
+    )
