@@ -234,7 +234,7 @@ Los siete ADR existen en inglés y ninguna referencia de SPEC o CLAUDE.md apunta
 | 9 | Canarios en `tests/integration/` en vez de `tests/canaries/` | No |
 | 10 | La SPEC habla de `docs/evals/<versión>.json`; `published.py` busca `v*.json` | No (ambigüedad de nombre) |
 
-Resumen: 4 justificadas, 6 sin justificar. Idioma de documentos: SPEC y BACKLOG en español, ADR en inglés, como manda `CLAUDE.md` (sin desviación). Stack: Python 3.14, FastAPI, SQLAlchemy 2, Next.js 16 y Node 24 verificados; Playwright y axe aún no están en `web/package.json` (llegan con EF-21).
+Resumen: 4 justificadas, 6 sin justificar. Idioma de documentos: SPEC y BACKLOG en español, ADR en inglés, como manda `CLAUDE.md` (sin desviación). Stack: Python 3.14, FastAPI (reemplazado por Litestar 2.x en ADR-0008, posterior a esta auditoría), SQLAlchemy 2, Next.js 16 y Node 24 verificados; Playwright y axe aún no están en `web/package.json` (llegan con EF-21).
 
 ---
 
